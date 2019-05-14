@@ -1,16 +1,12 @@
 [package]
-name = "mystcl"
+name = "tcl-sys"
 version = "0.1.0"
 authors = ["Purple Myst <PurpleMyst@users.noreply.github.com>"]
 edition = "2018"
 
-[lib]
-name = "mystcl"
-crate-type = ["cdylib"]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tcl-sys = { path = "./tcl-sys/" }
-pyo3 = { version = "0.7.0-alpha.1", features = ["extension-module"] }
 
 [build-dependencies]
 bindgen = "0.49.0"

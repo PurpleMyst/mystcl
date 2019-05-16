@@ -44,13 +44,11 @@ impl TkApp {
     }
 
     fn eval(&mut self, code: String) -> PyResult<String> {
-        unsafe {
-            let c_code = CString::new(code)?.into_raw();
-            self.check(tcl_sys::Tcl_Eval(self.interp, c_code))?;
+        // XXX: This string gets deleted on method exit. Does Tcl_Eval want its string to stay
+        // around?
+        let c_code = CString::new(code)?;
 
-            // XXX: Is this safe or does `Tcl_Eval` expect the string to stay around?
-            let _c_code = CString::from_raw(c_code);
-        }
+        self.check(unsafe { tcl_sys::Tcl_Eval(self.interp, c_code.as_ptr()) })?;
 
         self.get_result()
     }

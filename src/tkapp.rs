@@ -3,7 +3,10 @@ use std::{
     os::raw::{c_int, c_uint},
 };
 
-use crate::{exceptions::TclError, wrappers::TclObjWrapper};
+use crate::{
+    exceptions::TclError,
+    wrappers::{TclObjWrapper, TclPyTuple},
+};
 
 use pyo3::{
     prelude::*,
@@ -76,20 +79,13 @@ impl TkApp {
         }
     }
 
-    fn make_string_obj(&self, arg: &PyAny) -> PyResult<TclObjWrapper> {
+    pub(crate) fn make_string_obj(&mut self, arg: &PyAny) -> PyResult<TclObjWrapper> {
         let obj = if let Ok(s) = arg.downcast_ref::<PyString>() {
             TclObjWrapper::try_from_pystring(s)
         } else if let Ok(t) = arg.downcast_ref::<PyTuple>() {
-            let objv_wrappers = t
-                .into_iter()
-                .map(|arg| self.make_string_obj(arg))
-                .collect::<Result<Vec<_>, _>>()?;
+            let objv = TclPyTuple::new(self, t)?;
 
-            let objv = objv_wrappers.iter().map(|arg| arg.ptr).collect::<Vec<_>>();
-
-            TclObjWrapper::new(unsafe {
-                tcl_sys::Tcl_NewListObj(objv.len() as c_int, objv.as_ptr())
-            })
+            TclObjWrapper::new(unsafe { tcl_sys::Tcl_NewListObj(objv.len(), objv.as_ptr()) })
         } else {
             return Err(pyo3::exceptions::TypeError::py_err("Expected str or tuple"));
         };
@@ -112,18 +108,9 @@ impl Drop for TkApp {
 impl TkApp {
     #[args(args = "*")]
     fn call(&mut self, args: &PyTuple) -> PyResult<String> {
-        // We must keep these around even if we have the pointers themselves because the wrappers
-        // manage the refcount.
-        let objv_wrappers = args
-            .into_iter()
-            .map(|arg| self.make_string_obj(arg))
-            .collect::<Result<Vec<_>, _>>()?;
+        let objv = TclPyTuple::new(self, args)?;
 
-        let objv = objv_wrappers.iter().map(|arg| arg.ptr).collect::<Vec<_>>();
-
-        self.check(unsafe {
-            tcl_sys::Tcl_EvalObjv(self.interp, objv.len() as c_int, objv.as_ptr(), 0)
-        })?;
+        self.check(unsafe { tcl_sys::Tcl_EvalObjv(self.interp, objv.len(), objv.as_ptr(), 0) })?;
 
         self.get_result()
     }

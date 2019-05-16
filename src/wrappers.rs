@@ -34,6 +34,21 @@ impl TclObjWrapper {
     }
 }
 
+impl std::fmt::Debug for TclObjWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        unsafe {
+            f.debug_struct("TclObjWrapper")
+                .field("ptr", &format!("{:#p}", self.ptr))
+                .field("refCount", &(*self.ptr).refCount)
+                .field(
+                    "str",
+                    &std::ffi::CStr::from_ptr(tcl_sys::Tcl_GetString(self.ptr)),
+                )
+                .finish()
+        }
+    }
+}
+
 impl Drop for TclObjWrapper {
     fn drop(&mut self) {
         unsafe {

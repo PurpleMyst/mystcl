@@ -4,6 +4,7 @@ use pyo3::{prelude::*, wrap_pyfunction};
 
 mod exceptions;
 mod tkapp;
+mod wrappers;
 
 use tkapp::TkApp;
 

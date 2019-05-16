@@ -1,3 +1,3 @@
-use pyo3::{exceptions::Exception, create_exception};
+use pyo3::{create_exception, exceptions::Exception};
 
 create_exception!(mystcl, TclError, Exception);

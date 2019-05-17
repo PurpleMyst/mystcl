@@ -156,7 +156,6 @@ impl Drop for TclInterpData {
 
         self.commands
             .values()
-            .inspect(|x| println!("ptr: {:#p}", x))
             .for_each(|&ptr| std::mem::drop(unsafe { Box::from_raw(ptr) }))
     }
 }

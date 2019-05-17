@@ -58,7 +58,7 @@ impl TclInterp {
         };
 
         if res.is_null() {
-            panic!("FUCK ME");
+            return Err(TclError::py_err("Tcl_CreateCommand returned NULL"));
         }
 
         let old = self
@@ -76,6 +76,8 @@ impl TclInterp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // TODO: Add tests for a few more things.
 
     #[test]
     fn test_createcommand() {

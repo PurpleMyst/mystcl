@@ -23,14 +23,21 @@ impl TclObjWrapper {
         }
     }
 
-    pub fn try_from_pystring(s: &PyString) -> Option<Self> {
-        let data = s.as_bytes();
+    fn try_from_bytes(b: &[u8]) -> Option<Self> {
         unsafe {
             Self::new(tcl_sys::Tcl_NewStringObj(
-                data.as_ptr() as *const i8,
-                data.len() as c_int,
+                b.as_ptr() as *const c_char,
+                b.len() as c_int,
             ))
         }
+    }
+
+    pub fn try_from_string(s: String) -> Option<Self> {
+        Self::try_from_bytes(s.as_bytes())
+    }
+
+    pub fn try_from_pystring(s: &PyString) -> Option<Self> {
+        Self::try_from_bytes(s.as_bytes())
     }
 }
 

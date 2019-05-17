@@ -1,7 +1,6 @@
 use std::{
     ffi::{CStr, CString},
-    ops::{Deref, DerefMut},
-    os::raw::{c_char, c_int, c_uint, c_void},
+    os::raw::{c_int, c_uint},
     ptr::NonNull,
     rc::Rc,
     sync::Mutex,
@@ -9,7 +8,7 @@ use std::{
 
 use crate::{
     exceptions::TclError,
-    wrappers::{TclObjWrapper, TclPyTuple},
+    wrappers::{Objv, TclObjWrapper},
 };
 
 use pyo3::{
@@ -17,10 +16,12 @@ use pyo3::{
     types::{PyAny, PyString, PyTuple},
 };
 
+#[derive(Debug)]
 struct TclInterpData {
     interp: Option<NonNull<tcl_sys::Tcl_Interp>>,
 }
 
+#[derive(Clone)]
 pub struct TclInterp(Rc<Mutex<TclInterpData>>);
 
 impl TclInterp {
@@ -33,23 +34,25 @@ impl TclInterp {
                 ),
             }));
 
-            let mut inst = Self(interp);
+            let inst = Self(interp);
 
             inst.check_statuscode(tcl_sys::Tcl_Init(inst.interp_ptr()?))?;
-            inst.check_statuscode(tcl_sys::Tk_Init(inst.interp_ptr()?))?;
-
-            // HACK: Closest thing we have to id(self)
-            let id = &inst as *const _ as usize;
-            let exit_var_name = format!("exit_var_{}", id);
-
-            // NOTE: This is meant to be a literal {}
-            inst.eval(String::from("rename exit {}"))?;
-            inst.eval(format!("set {} false", exit_var_name))?;
-            inst.eval(String::from("package require Tk"))?;
-            inst.eval(format!("bind . <Destroy> {{ set {} true }}", exit_var_name))?;
 
             Ok(inst)
         }
+    }
+
+    pub fn init_tk(&mut self) -> PyResult<()> {
+        self.check_statuscode(unsafe { tcl_sys::Tk_Init(self.interp_ptr()?) })?;
+
+        let id = &self as *const _ as usize;
+        let exit_var_name = format!("exit_var_{}", id);
+        self.eval(String::from("package require Tk"))?;
+        self.eval(String::from("rename exit {}"))?;
+        self.eval(format!("set {} false", exit_var_name))?;
+        self.eval(format!("bind . <Destroy> {{ set {} true }}", exit_var_name))?;
+
+        Ok(())
     }
 
     pub(crate) fn interp_ptr(&self) -> PyResult<*mut tcl_sys::Tcl_Interp> {
@@ -61,10 +64,23 @@ impl TclInterp {
             .map(|ptr| ptr.as_ptr())
     }
 
-    fn eval(&mut self, code: String) -> PyResult<String> {
+    pub fn eval(&mut self, code: String) -> PyResult<String> {
         let c_code = CString::new(code)?;
 
         self.check_statuscode(unsafe { tcl_sys::Tcl_Eval(self.interp_ptr()?, c_code.as_ptr()) })?;
+
+        self.get_result()
+    }
+
+    pub fn call<'a, I>(&mut self, objv: I) -> PyResult<String>
+    where
+        I: IntoIterator<Item = &'a PyAny>,
+    {
+        let objv = Objv::new(self, objv)?;
+
+        self.check_statuscode(unsafe {
+            tcl_sys::Tcl_EvalObjv(self.interp_ptr()?, objv.len(), objv.as_ptr(), 0)
+        })?;
 
         self.get_result()
     }
@@ -98,7 +114,7 @@ impl TclInterp {
         let obj = if let Ok(s) = arg.downcast_ref::<PyString>() {
             TclObjWrapper::try_from_pystring(s)
         } else if let Ok(t) = arg.downcast_ref::<PyTuple>() {
-            let objv = TclPyTuple::new(self, t)?;
+            let objv = Objv::new(self, t)?;
 
             TclObjWrapper::new(unsafe { tcl_sys::Tcl_NewListObj(objv.len(), objv.as_ptr()) })
         } else {

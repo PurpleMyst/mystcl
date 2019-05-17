@@ -1,22 +1,6 @@
-use std::{
-    collections::HashMap,
-    ffi::{CStr, CString},
-    os::raw::{c_char, c_int, c_uint, c_void},
-    ptr::NonNull,
-    slice,
-    sync::{Arc, Mutex},
-};
+use pyo3::{prelude::*, types::PyTuple};
 
-use crate::{
-    exceptions::TclError,
-    tclinterp::TclInterp,
-    wrappers::{TclObjWrapper, TclPyTuple},
-};
-
-use pyo3::{
-    prelude::*,
-    types::{PyAny, PyString, PyTuple},
-};
+use crate::tclinterp::TclInterp;
 
 #[pyclass]
 pub struct TkApp {
@@ -25,9 +9,11 @@ pub struct TkApp {
 
 impl TkApp {
     pub fn new() -> PyResult<Self> {
-        Ok(Self {
+        let mut inst = Self {
             interp: TclInterp::new()?,
-        })
+        };
+        inst.interp.init_tk()?;
+        Ok(inst)
     }
 }
 
@@ -35,14 +21,7 @@ impl TkApp {
 impl TkApp {
     #[args(args = "*")]
     fn call(&mut self, args: &PyTuple) -> PyResult<String> {
-        // TODO: Put this in TclInterp
-        let objv = TclPyTuple::new(&mut self.interp, args)?;
-
-        self.interp.check_statuscode(unsafe {
-            tcl_sys::Tcl_EvalObjv(self.interp.interp_ptr()?, objv.len(), objv.as_ptr(), 0)
-        })?;
-
-        self.interp.get_result()
+        self.interp.call(args)
     }
 
     fn delete(&mut self) -> PyResult<()> {

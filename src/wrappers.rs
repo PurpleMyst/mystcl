@@ -57,10 +57,9 @@ impl Drop for TclObjWrapper {
     }
 }
 
-// XXX: Can we give this a better name?
-pub struct TclPyTuple(Vec<TclObjWrapper>, Vec<*mut tcl_sys::Tcl_Obj>);
+pub struct Objv(Vec<TclObjWrapper>, Vec<*mut tcl_sys::Tcl_Obj>);
 
-impl TclPyTuple {
+impl Objv {
     pub fn new<'a, I>(app: &mut TclInterp, it: I) -> PyResult<Self>
     where
         I: IntoIterator<Item = &'a PyAny>,

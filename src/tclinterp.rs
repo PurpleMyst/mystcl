@@ -1,8 +1,10 @@
 use std::{
+    collections::HashMap,
     ffi::{CStr, CString},
-    os::raw::{c_int, c_uint},
+    os::raw::*,
     ptr::NonNull,
     rc::Rc,
+    slice,
     sync::Mutex,
 };
 
@@ -16,9 +18,12 @@ use pyo3::{
     types::{PyAny, PyString, PyTuple},
 };
 
-#[derive(Debug)]
+mod createcommand;
+use createcommand::*;
+
 struct TclInterpData {
     interp: Option<NonNull<tcl_sys::Tcl_Interp>>,
+    commands: HashMap<CString, *mut CommandData>,
 }
 
 #[derive(Clone)]
@@ -32,6 +37,7 @@ impl TclInterp {
                     NonNull::new(tcl_sys::Tcl_CreateInterp())
                         .ok_or_else(|| TclError::py_err("Tcl_CreateInterp returned NULL"))?,
                 ),
+                commands: Default::default(),
             }));
 
             let inst = Self(interp);
@@ -99,6 +105,11 @@ impl TclInterp {
             .and_then(|ptr| self.get_string(ptr))
     }
 
+    pub fn set_result(&mut self, obj: TclObjWrapper) -> PyResult<()> {
+        unsafe { tcl_sys::Tcl_SetObjResult(self.interp_ptr()?, obj.ptr) }
+        Ok(())
+    }
+
     pub fn get_error(&self) -> PyResult<PyErr> {
         Ok(TclError::py_err(self.get_result()?))
     }
@@ -135,10 +146,17 @@ impl TclInterp {
     }
 }
 
-impl Drop for TclInterp {
+// We must implement drop on `TclInterpData` and not `TclInterp` because otherwise we try to drop
+// stuff at the same time in different instances and demons spawn.
+impl Drop for TclInterpData {
     fn drop(&mut self) {
-        if self.0.lock().unwrap().interp.is_some() {
-            self.delete().expect("Failed to drop TkApp");
+        if self.interp.is_some() {
+            unsafe { tcl_sys::Tcl_DeleteInterp(self.interp.unwrap().as_ptr()) };
         }
+
+        self.commands
+            .values()
+            .inspect(|x| println!("ptr: {:#p}", x))
+            .for_each(|&ptr| std::mem::drop(unsafe { Box::from_raw(ptr) }))
     }
 }

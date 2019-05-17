@@ -3,6 +3,7 @@
 use pyo3::{prelude::*, wrap_pyfunction};
 
 mod exceptions;
+mod tclinterp;
 mod tkapp;
 mod wrappers;
 

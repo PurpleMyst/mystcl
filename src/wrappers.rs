@@ -5,7 +5,7 @@ use pyo3::{
     types::{PyAny, PyString},
 };
 
-use crate::tkapp::TkApp;
+use crate::tclinterp::TclInterp;
 
 pub struct TclObjWrapper {
     pub ptr: *mut tcl_sys::Tcl_Obj,
@@ -61,7 +61,7 @@ impl Drop for TclObjWrapper {
 pub struct TclPyTuple(Vec<TclObjWrapper>, Vec<*mut tcl_sys::Tcl_Obj>);
 
 impl TclPyTuple {
-    pub fn new<'a, I>(app: &mut TkApp, it: I) -> PyResult<Self>
+    pub fn new<'a, I>(app: &mut TclInterp, it: I) -> PyResult<Self>
     where
         I: IntoIterator<Item = &'a PyAny>,
     {

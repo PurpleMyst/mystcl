@@ -1,6 +1,7 @@
 use std::{
     ffi::{CStr, CString},
     os::raw::{c_int, c_uint},
+    ptr::NonNull,
 };
 
 use crate::{
@@ -15,22 +16,30 @@ use pyo3::{
 
 #[pyclass]
 pub struct TkApp {
-    interp: *mut tcl_sys::Tcl_Interp,
+    interp: Option<NonNull<tcl_sys::Tcl_Interp>>,
+}
+
+macro_rules! interp {
+    ($interp:expr) => {
+        $interp
+            .interp
+            .ok_or_else(|| TclError::py_err("Tried to use interpreter after deletion"))?
+            .as_ptr()
+    };
 }
 
 impl TkApp {
     pub fn new() -> PyResult<Self> {
         unsafe {
-            let interp = tcl_sys::Tcl_CreateInterp();
-
-            if interp.is_null() {
-                return Err(TclError::py_err("fuck"));
-            };
+            let interp = Some(
+                NonNull::new(tcl_sys::Tcl_CreateInterp())
+                    .ok_or_else(|| TclError::py_err("Tcl_CreateInterp returned NULL"))?,
+            );
 
             let mut inst = TkApp { interp };
 
-            inst.check(tcl_sys::Tcl_Init(inst.interp))?;
-            inst.check(tcl_sys::Tk_Init(inst.interp))?;
+            inst.check(tcl_sys::Tcl_Init(interp!(inst)))?;
+            inst.check(tcl_sys::Tk_Init(interp!(inst)))?;
 
             // HACK: Closest thing we have to id(self)
             let id = &inst as *const _ as usize;
@@ -51,13 +60,13 @@ impl TkApp {
         // around?
         let c_code = CString::new(code)?;
 
-        self.check(unsafe { tcl_sys::Tcl_Eval(self.interp, c_code.as_ptr()) })?;
+        self.check(unsafe { tcl_sys::Tcl_Eval(interp!(self), c_code.as_ptr()) })?;
 
         self.get_result()
     }
 
     fn get_result(&self) -> PyResult<String> {
-        let result = unsafe { tcl_sys::Tcl_GetObjResult(self.interp) };
+        let result = unsafe { tcl_sys::Tcl_GetObjResult(interp!(self)) };
 
         if result.is_null() {
             Err(TclError::py_err("Tcl_GetObjResult returned NULL"))
@@ -100,7 +109,9 @@ impl TkApp {
 
 impl Drop for TkApp {
     fn drop(&mut self) {
-        unsafe { tcl_sys::Tcl_DeleteInterp(self.interp) }
+        if self.interp.is_some() {
+            self.delete().expect("Failed to drop TkApp");
+        }
     }
 }
 
@@ -110,8 +121,14 @@ impl TkApp {
     fn call(&mut self, args: &PyTuple) -> PyResult<String> {
         let objv = TclPyTuple::new(self, args)?;
 
-        self.check(unsafe { tcl_sys::Tcl_EvalObjv(self.interp, objv.len(), objv.as_ptr(), 0) })?;
+        self.check(unsafe { tcl_sys::Tcl_EvalObjv(interp!(self), objv.len(), objv.as_ptr(), 0) })?;
 
         self.get_result()
+    }
+
+    fn delete(&mut self) -> PyResult<()> {
+        unsafe { tcl_sys::Tcl_DeleteInterp(interp!(self)) };
+        self.interp = None;
+        Ok(())
     }
 }

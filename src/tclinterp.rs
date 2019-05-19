@@ -139,6 +139,23 @@ impl TclInterp {
         }
     }
 
+    pub fn splitlist(&mut self, arg: &PyString) -> PyResult<Vec<String>> {
+        let obj = self.make_string_obj(arg.as_ref())?;
+
+        let mut objc: c_int = 0;
+        let mut objv: *mut *mut tcl_sys::Tcl_Obj = std::ptr::null_mut();
+
+        self.check_statuscode(unsafe {
+            tcl_sys::Tcl_ListObjGetElements(self.interp_ptr()?, obj.ptr, &mut objc, &mut objv)
+        })?;
+
+        unsafe { slice::from_raw_parts(objv, objc as usize) }
+            .into_iter()
+            .map(|&ptr| NonNull::new(ptr).unwrap())
+            .map(|ptr| self.get_string(ptr))
+            .collect::<Result<Vec<_>, _>>()
+    }
+
     pub fn delete(&mut self) -> PyResult<()> {
         unsafe { tcl_sys::Tcl_DeleteInterp(self.interp_ptr()?) };
         self.0.lock().unwrap().interp = None;

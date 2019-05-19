@@ -1,6 +1,6 @@
 use pyo3::{
     prelude::*,
-    types::{PyAny, PyTuple},
+    types::{PyAny, PyString, PyTuple},
 };
 
 use crate::{tclinterp::TclInterp, wrappers::TclObj};
@@ -29,6 +29,10 @@ impl TkApp {
 
     fn eval(&mut self, code: String) -> PyResult<String> {
         self.interp.eval(code)
+    }
+
+    fn splitlist(&mut self, arg: &PyString) -> PyResult<Vec<String>> {
+        self.interp.splitlist(arg)
     }
 
     fn delete(&mut self) -> PyResult<()> {
@@ -133,5 +137,27 @@ mod tests {
                 .unwrap(),
             "('bar', 'baz')"
         );
+    }
+
+    #[test]
+    fn test_splitlist() {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+
+        let mut app = TkApp::new().unwrap();
+
+        let l1 = app
+            .call(pytuple!(py, ["list", "a", "b", "c and d"]))
+            .unwrap();
+
+        let l1_tuple_py = PyString::new(py, &l1);
+        let l1_tuple = l1_tuple_py.as_ref(py);
+
+        let mut l1_parts = app.splitlist(&l1_tuple).unwrap();
+        l1_parts.insert(0, "list".to_owned());
+
+        let l2 = app.call(&PyTuple::new(py, l1_parts).as_ref(py)).unwrap();
+
+        assert_eq!(l1, l2);
     }
 }

@@ -1,5 +1,7 @@
 #![deny(unused_imports, unused_must_use)]
 
+// FIXME: Use a custom-built type instead of `CStr` to handle strings containing NUL bytes.
+
 use pyo3::{prelude::*, wrap_pyfunction};
 
 mod exceptions;

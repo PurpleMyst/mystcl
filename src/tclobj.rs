@@ -1,5 +1,9 @@
 use std::{ffi::CStr, os::raw::*, ptr::NonNull};
 
+use pyo3::types::{PyAny, PyString, PyTuple};
+
+use crate::wrappers::Objv;
+
 pub struct TclObj {
     ptr: NonNull<tcl_sys::Tcl_Obj>,
 }
@@ -17,18 +21,53 @@ impl TclObj {
     }
 }
 
-impl<T> From<T> for TclObj
-where
-    T: AsRef<[u8]>,
-{
-    fn from(s: T) -> Self {
-        let s = s.as_ref();
+// Is `IntoTclObj` a better name for this?
+pub trait ToTclObj {
+    fn to_tcl_obj(self) -> TclObj;
+}
 
-        // We do not care about the lifetime of `s` due to `Tcl_NewStringObj` creating a copy of
-        // its argument.
-        let ptr: *mut _ =
-            unsafe { tcl_sys::Tcl_NewStringObj(s.as_ptr() as *const c_char, s.len() as c_int) };
-        Self::new(NonNull::new(ptr).unwrap())
+impl ToTclObj for &[u8] {
+    fn to_tcl_obj(self) -> TclObj {
+        // `Tcl_NewStringObj` copies its argument.
+        let ptr = unsafe {
+            tcl_sys::Tcl_NewStringObj(self.as_ptr() as *const c_char, self.len() as c_int)
+        };
+        TclObj::new(NonNull::new(ptr).unwrap())
+    }
+}
+
+impl ToTclObj for &str {
+    fn to_tcl_obj(self) -> TclObj {
+        self.as_bytes().to_tcl_obj()
+    }
+}
+
+impl ToTclObj for &PyString {
+    fn to_tcl_obj(self) -> TclObj {
+        self.as_bytes().to_tcl_obj()
+    }
+}
+
+impl ToTclObj for &PyTuple {
+    fn to_tcl_obj(self) -> TclObj {
+        let objv = Objv::new(self);
+
+        let ptr = unsafe { tcl_sys::Tcl_NewListObj(objv.len(), objv.as_ptr()) };
+        let ptr = NonNull::new(ptr).unwrap();
+
+        TclObj::new(ptr)
+    }
+}
+
+impl ToTclObj for &PyAny {
+    fn to_tcl_obj(self) -> TclObj {
+        if let Ok(value) = self.downcast_ref::<PyString>() {
+            value.to_tcl_obj()
+        } else if let Ok(value) = self.downcast_ref::<PyTuple>() {
+            value.to_tcl_obj()
+        } else {
+            unimplemented!()
+        }
     }
 }
 

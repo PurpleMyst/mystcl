@@ -3,7 +3,7 @@ use pyo3::{
     types::{PyAny, PyString, PyTuple},
 };
 
-use crate::{tclinterp::TclInterp, tclobj::TclObj};
+use crate::{tclinterp::TclInterp, tclobj::ToTclObj};
 
 #[pyclass]
 pub struct TkApp {
@@ -59,8 +59,8 @@ impl TkApp {
 
                 func.to_object(py)
                     .call(py, PyTuple::new(py, args), None)
-                    .and_then(|v| cmd_data.interp.make_string_obj(&v.as_ref(py)))
-                    .map_err(|e| TclObj::from(crate::errmsg(py, &e)))
+                    .map(|v| v.as_ref(py).to_tcl_obj())
+                    .map_err(|e| crate::errmsg(py, &e).to_tcl_obj())
             })
     }
 }

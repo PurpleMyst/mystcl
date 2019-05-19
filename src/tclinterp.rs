@@ -8,12 +8,13 @@ use std::{
     sync::Mutex,
 };
 
-use crate::{exceptions::TclError, tclobj::TclObj, wrappers::Objv};
-
-use pyo3::{
-    prelude::*,
-    types::{PyAny, PyString, PyTuple},
+use crate::{
+    exceptions::TclError,
+    tclobj::{TclObj, ToTclObj},
+    wrappers::Objv,
 };
+
+use pyo3::{prelude::*, types::PyAny};
 
 mod createcommand;
 use createcommand::*;
@@ -75,11 +76,11 @@ impl TclInterp {
         self.get_result().map(|obj| obj.to_string())
     }
 
-    pub fn call<'a, I>(&mut self, objv: I) -> PyResult<String>
+    pub fn call<'a, I>(&mut self, it: I) -> PyResult<String>
     where
         I: IntoIterator<Item = &'a PyAny>,
     {
-        let objv = Objv::new(self, objv)?;
+        let objv = Objv::new(it);
 
         self.check_statuscode(unsafe {
             tcl_sys::Tcl_EvalObjv(self.interp_ptr()?, objv.len(), objv.as_ptr(), 0)
@@ -110,24 +111,8 @@ impl TclInterp {
         }
     }
 
-    pub(crate) fn make_string_obj(&self, arg: &PyAny) -> PyResult<TclObj> {
-        if let Ok(s) = arg.downcast_ref::<PyString>() {
-            Ok(TclObj::from(s.as_bytes()))
-        } else if let Ok(t) = arg.downcast_ref::<PyTuple>() {
-            let objv = Objv::new(self, t)?;
-
-            let ptr = unsafe { tcl_sys::Tcl_NewListObj(objv.len(), objv.as_ptr()) };
-            let ptr = NonNull::new(ptr)
-                .ok_or_else(|| TclError::py_err("Tcl_NewListObj returned NULL"))?;
-
-            Ok(TclObj::new(ptr))
-        } else {
-            Err(pyo3::exceptions::TypeError::py_err("Expected str or tuple"))
-        }
-    }
-
-    pub fn splitlist(&mut self, arg: &PyString) -> PyResult<Vec<String>> {
-        let obj = self.make_string_obj(arg.as_ref())?;
+    pub fn splitlist(&mut self, arg: impl ToTclObj) -> PyResult<Vec<String>> {
+        let obj = arg.to_tcl_obj();
 
         let mut objc: c_int = 0;
         let mut objv: *mut *mut tcl_sys::Tcl_Obj = std::ptr::null_mut();

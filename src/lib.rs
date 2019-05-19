@@ -9,6 +9,16 @@ mod wrappers;
 
 use tkapp::TkApp;
 
+#[cfg(test)]
+fn errmsg(py: Python, err: &PyErr) -> String {
+    match &err.pvalue {
+        pyo3::PyErrValue::ToObject(obj_candidate) => {
+            obj_candidate.to_object(py).extract::<String>(py).unwrap()
+        }
+        _ => unimplemented!(),
+    }
+}
+
 #[pyfunction]
 fn create() -> PyResult<Py<TkApp>> {
     let gil = Python::acquire_gil();

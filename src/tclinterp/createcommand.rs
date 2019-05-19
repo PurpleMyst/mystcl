@@ -1,4 +1,4 @@
-use std::os::raw::*;
+use std::{any::Any, os::raw::*};
 
 use pyo3::prelude::*;
 
@@ -6,10 +6,13 @@ use crate::wrappers::TclObjWrapper;
 
 use super::*;
 
-pub type Command = fn(&mut TclInterp, &[&CStr]) -> TclObjWrapper;
+pub type Command = fn(&CommandData, &[&CStr]) -> Result<TclObjWrapper, TclObjWrapper>;
 
-// XXX: This leaks memory
-pub(super) struct CommandData(TclInterp, Command);
+pub struct CommandData {
+    interp: TclInterp,
+    cmd: Command,
+    data: Box<Any>,
+}
 
 #[allow(dead_code)]
 extern "C" fn cmd_callback(
@@ -27,14 +30,23 @@ extern "C" fn cmd_callback(
             .collect::<Vec<_>>()
     };
 
-    let obj = client_data.1(&mut client_data.0, args.as_slice());
-    client_data.0.set_result(obj).unwrap();
+    let res = (client_data.cmd)(&client_data, &args);
 
-    return tcl_sys::TCL_OK as c_int;
+    match res {
+        Ok(value) => {
+            client_data.interp.set_result(value).unwrap();
+            tcl_sys::TCL_OK as c_int
+        }
+
+        Err(value) => {
+            client_data.interp.set_result(value).unwrap();
+            tcl_sys::TCL_ERROR as c_int
+        }
+    }
 }
 
 impl TclInterp {
-    pub fn createcommand(&mut self, name: &str, cmd: Command) -> PyResult<()> {
+    pub fn createcommand(&mut self, name: &str, data: Box<Any>, cmd: Command) -> PyResult<()> {
         let name = CString::new(name)?;
 
         if self.0.lock().unwrap().commands.contains_key(&name) {
@@ -44,7 +56,11 @@ impl TclInterp {
             )));
         }
 
-        let command_data = CommandData(self.clone(), cmd);
+        let command_data = CommandData {
+            interp: self.clone(),
+            cmd,
+            data,
+        };
         let command_data = Box::into_raw(Box::new(command_data)) as *mut c_void;
 
         let res = unsafe {
@@ -80,13 +96,44 @@ mod tests {
     // TODO: Add tests for a few more things.
 
     #[test]
-    fn test_createcommand() {
+    fn test_createcommand_data() {
         let mut interp = TclInterp::new().unwrap();
         interp
-            .createcommand("foo", |_interp, _args| {
-                TclObjWrapper::try_from_string("bar".to_string()).unwrap()
+            .createcommand("foo", Box::new("bar".to_string()), |data, _args| {
+                data.data
+                    .downcast_ref::<String>()
+                    .and_then(|s| TclObjWrapper::try_from_string(s.to_owned()))
+                    .ok_or_else(|| unreachable!())
             })
             .unwrap();
         assert_eq!(interp.eval("foo".to_string()).unwrap(), "bar");
+    }
+
+    #[test]
+    fn test_createcommand_args() {
+        let mut interp = TclInterp::new().unwrap();
+        interp
+            .createcommand("ham", Box::new("unused"), |data, args| {
+                assert_eq!(data.data.downcast_ref::<&str>(), Some(&"unused"));
+
+                args.into_iter()
+                    .map(|s| s.to_str().to_owned())
+                    .collect::<Result<Vec<_>, _>>()
+                    .or_else(|_| unreachable!())
+                    .and_then(|v| {
+                        TclObjWrapper::try_from_string(v.join(" ")).ok_or_else(|| unreachable!())
+                    })
+            })
+            .unwrap();
+        assert_eq!(
+            interp
+                .eval("ham spam ham spam spam ham ham spam".to_string())
+                .map_err(|err| {
+                    let gil = Python::acquire_gil();
+                    crate::errmsg(gil.python(), &err)
+                })
+                .unwrap(),
+            "ham spam ham spam spam ham ham spam"
+        );
     }
 }

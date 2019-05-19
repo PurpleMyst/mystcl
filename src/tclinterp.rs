@@ -63,7 +63,7 @@ impl TclInterp {
             .unwrap()
             .interp
             .ok_or_else(|| TclError::new("Tried to use interpreter after deletion"))
-            .map(|ptr| ptr.as_ptr())
+            .map(NonNull::as_ptr)
     }
 
     pub fn eval(&mut self, code: String) -> Result<String, TclError> {
@@ -75,7 +75,7 @@ impl TclInterp {
         self.get_result().map(|obj| obj.to_string())
     }
 
-    pub fn call<'a, I>(&mut self, it: I) -> Result<String, TclError>
+    pub fn call<I>(&mut self, it: I) -> Result<String, TclError>
     where
         I: IntoIterator,
         I::Item: ToTclObj,
@@ -122,7 +122,7 @@ impl TclInterp {
         })?;
 
         Ok(unsafe { slice::from_raw_parts(objv, objc as usize) }
-            .into_iter()
+            .iter()
             .map(|&ptr| TclObj::new(NonNull::new(ptr).unwrap()).to_string())
             .collect::<Vec<_>>())
     }

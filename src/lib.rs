@@ -1,4 +1,5 @@
 #![deny(unused_imports, unused_must_use)]
+#![allow(clippy::identity_conversion)] // Because clippy complains about pyo3.
 
 // FIXME: Use a custom-built type instead of `CStr` to handle strings containing NUL bytes.
 

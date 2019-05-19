@@ -22,7 +22,7 @@ extern "C" fn cmd_callback(
 
     let args = unsafe {
         slice::from_raw_parts(argv, argc as usize)
-            .into_iter()
+            .iter()
             .skip(1)
             .map(|&s| CStr::from_ptr(s))
             .collect::<Vec<_>>()

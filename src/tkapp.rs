@@ -52,7 +52,7 @@ impl TkApp {
                     .to_owned();
 
                 let args = args
-                    .into_iter()
+                    .iter()
                     .map(|s| s.to_str())
                     .collect::<Result<Vec<_>, _>>()
                     .unwrap();

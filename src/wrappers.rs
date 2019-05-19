@@ -5,10 +5,10 @@ use crate::tclobj::{TclObj, ToTclObj};
 pub struct Objv(Vec<TclObj>, Vec<*mut tcl_sys::Tcl_Obj>);
 
 impl Objv {
-    pub fn new<I, T>(it: I) -> Self
+    pub fn new<I>(it: I) -> Self
     where
-        I: IntoIterator<Item = T>,
-        T: ToTclObj,
+        I: IntoIterator,
+        I::Item: ToTclObj,
     {
         let wrappers = it.into_iter().map(ToTclObj::to_tcl_obj).collect::<Vec<_>>();
         let wrapper_ptrs = wrappers.iter().map(TclObj::as_ptr).collect::<Vec<_>>();

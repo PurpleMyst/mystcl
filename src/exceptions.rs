@@ -1,5 +1,13 @@
+use std::borrow::Cow;
+
 #[derive(Debug, Clone)]
-pub struct TclError(pub String);
+pub struct TclError(pub Cow<'static, str>);
+
+impl TclError {
+    pub fn new(s: impl Into<Cow<'static, str>>) -> Self {
+        Self(s.into())
+    }
+}
 
 mod py {
     use pyo3::create_exception;

@@ -31,7 +31,7 @@ impl TclInterp {
             let interp = Rc::new(Mutex::new(TclInterpData {
                 interp: Some(
                     NonNull::new(tcl_sys::Tcl_CreateInterp())
-                        .ok_or_else(|| TclError("Tcl_CreateInterp returned NULL".to_owned()))?,
+                        .ok_or_else(|| TclError::new("Tcl_CreateInterp returned NULL"))?,
                 ),
                 commands: Default::default(),
             }));
@@ -62,13 +62,13 @@ impl TclInterp {
             .lock()
             .unwrap()
             .interp
-            .ok_or_else(|| TclError("Tried to use interpreter after deletion".to_owned()))
+            .ok_or_else(|| TclError::new("Tried to use interpreter after deletion"))
             .map(|ptr| ptr.as_ptr())
     }
 
     pub fn eval(&mut self, code: String) -> Result<String, TclError> {
-        let c_code = CString::new(code)
-            .map_err(|_| TclError("code must not contain NUL bytes.".to_owned()))?;
+        let c_code =
+            CString::new(code).map_err(|_| TclError::new("code must not contain NUL bytes."))?;
 
         self.check_statuscode(unsafe { tcl_sys::Tcl_Eval(self.interp_ptr()?, c_code.as_ptr()) })?;
 
@@ -91,7 +91,7 @@ impl TclInterp {
 
     pub fn get_result(&self) -> Result<TclObj, TclError> {
         NonNull::new(unsafe { tcl_sys::Tcl_GetObjResult(self.interp_ptr()?) })
-            .ok_or_else(|| TclError("Tcl_GetObjResult returned NULL".to_owned()))
+            .ok_or_else(|| TclError::new("Tcl_GetObjResult returned NULL"))
             .map(TclObj::new)
     }
 
@@ -101,7 +101,7 @@ impl TclInterp {
     }
 
     pub fn get_error(&self) -> Result<TclError, TclError> {
-        Ok(TclError(self.get_result()?.to_string()))
+        Ok(TclError::new(self.get_result()?.to_string()))
     }
 
     pub fn check_statuscode(&self, value: c_int) -> Result<(), TclError> {

@@ -50,11 +50,11 @@ impl TclInterp {
         data: Box<Any>,
         cmd: Command,
     ) -> Result<(), TclError> {
-        let name = CString::new(name)
-            .map_err(|_| TclError("name must not contain NUL bytes.".to_owned()))?;
+        let name =
+            CString::new(name).map_err(|_| TclError::new("name must not contain NUL bytes."))?;
 
         if self.0.lock().unwrap().commands.contains_key(&name) {
-            return Err(TclError(format!(
+            return Err(TclError::new(format!(
                 "Command with name {:?} already exists.",
                 name
             )));
@@ -78,7 +78,7 @@ impl TclInterp {
         };
 
         if res.is_null() {
-            return Err(TclError("Tcl_CreateCommand returned NULL".to_owned()));
+            return Err(TclError::new("Tcl_CreateCommand returned NULL"));
         }
 
         let old = self

@@ -1,3 +1,4 @@
+// TODO: Do something with deleters.
 use std::{any::Any, os::raw::*};
 
 use pyo3::prelude::*;
@@ -9,9 +10,9 @@ use super::*;
 pub type Command = fn(&CommandData, &[&CStr]) -> Result<TclObjWrapper, TclObjWrapper>;
 
 pub struct CommandData {
-    interp: TclInterp,
-    cmd: Command,
-    data: Box<Any>,
+    pub interp: TclInterp,
+    pub cmd: Command,
+    pub data: Box<Any>,
 }
 
 #[allow(dead_code)]

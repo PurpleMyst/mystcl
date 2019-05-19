@@ -1,6 +1,9 @@
-use pyo3::{prelude::*, types::PyTuple};
+use pyo3::{
+    prelude::*,
+    types::{PyAny, PyTuple},
+};
 
-use crate::tclinterp::TclInterp;
+use crate::{tclinterp::TclInterp, wrappers::TclObjWrapper};
 
 #[pyclass]
 pub struct TkApp {
@@ -27,13 +30,36 @@ impl TkApp {
     fn delete(&mut self) -> PyResult<()> {
         self.interp.delete()
     }
+
+    fn createcommand(&mut self, name: &str, func: Py<PyAny>) -> PyResult<()> {
+        self.interp
+            .createcommand(name, Box::new(func), |cmd_data, args| {
+                let gil = Python::acquire_gil();
+                let py = gil.python();
+
+                let func = cmd_data
+                    .data
+                    .downcast_ref::<Py<PyAny>>()
+                    .unwrap()
+                    .to_owned();
+
+                let args = args
+                    .into_iter()
+                    .map(|s| s.to_str())
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap();
+
+                func.to_object(py)
+                    .call(py, PyTuple::new(py, args), None)
+                    .and_then(|v| cmd_data.interp.make_string_obj(&v.as_ref(py)))
+                    .map_err(|e| TclObjWrapper::try_from_string(crate::errmsg(py, &e)).unwrap())
+            })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use pyo3::PyErrValue;
 
     #[test]
     fn test_new() {
@@ -59,15 +85,6 @@ mod tests {
         );
     }
 
-    fn errmsg(py: Python, err: &PyErr) -> String {
-        match &err.pvalue {
-            PyErrValue::ToObject(obj_candidate) => {
-                obj_candidate.to_object(py).extract::<String>(py).unwrap()
-            }
-            _ => unimplemented!(),
-        }
-    }
-
     #[test]
     fn test_delete() {
         let gil = Python::acquire_gil();
@@ -77,9 +94,32 @@ mod tests {
         app.delete().expect("Could not delete interpeter");
 
         if let Err(err) = app.call(&pytuple!(py, ["return", "test123"])) {
-            assert_eq!(errmsg(py, &err), "Tried to use interpreter after deletion");
+            assert_eq!(
+                crate::errmsg(py, &err),
+                "Tried to use interpreter after deletion"
+            );
         } else {
             panic!("TkApp::call did not return Err(_) after TkApp::delete");
         }
+    }
+
+    #[test]
+    fn test_createcommand() {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+
+        let func = py.eval("lambda *args: str(args)", None, None).unwrap();
+        let func = func.extract::<Py<PyAny>>().unwrap();
+
+        let mut app = TkApp::new().unwrap();
+
+        app.createcommand("foo", func).unwrap();
+
+        assert_eq!(
+            app.call(&pytuple!(py, ["foo", "bar", "baz"]))
+                .map_err(|e| crate::errmsg(py, &e))
+                .unwrap(),
+            "('foo', 'bar', 'baz')"
+        );
     }
 }

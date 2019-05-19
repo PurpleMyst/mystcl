@@ -121,7 +121,7 @@ impl TclInterp {
         }
     }
 
-    pub(crate) fn make_string_obj(&mut self, arg: &PyAny) -> PyResult<TclObjWrapper> {
+    pub(crate) fn make_string_obj(&self, arg: &PyAny) -> PyResult<TclObjWrapper> {
         let obj = if let Ok(s) = arg.downcast_ref::<PyString>() {
             TclObjWrapper::try_from_pystring(s)
         } else if let Ok(t) = arg.downcast_ref::<PyTuple>() {

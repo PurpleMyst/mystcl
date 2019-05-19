@@ -67,7 +67,7 @@ impl Drop for TclObjWrapper {
 pub struct Objv(Vec<TclObjWrapper>, Vec<*mut tcl_sys::Tcl_Obj>);
 
 impl Objv {
-    pub fn new<'a, I>(app: &mut TclInterp, it: I) -> PyResult<Self>
+    pub fn new<'a, I>(app: &TclInterp, it: I) -> PyResult<Self>
     where
         I: IntoIterator<Item = &'a PyAny>,
     {

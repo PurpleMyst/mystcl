@@ -9,13 +9,19 @@ mod wrappers;
 
 use tkapp::TkApp;
 
-#[cfg(test)]
 fn errmsg(py: Python, err: &PyErr) -> String {
+    use pyo3::PyErrValue;
+
     match &err.pvalue {
-        pyo3::PyErrValue::ToObject(obj_candidate) => {
+        PyErrValue::None => panic!("No error message"),
+
+        PyErrValue::Value(obj) => obj.extract::<String>(py).unwrap(),
+
+        PyErrValue::ToArgs(args) => args.arguments(py).extract::<String>(py).unwrap(),
+
+        PyErrValue::ToObject(obj_candidate) => {
             obj_candidate.to_object(py).extract::<String>(py).unwrap()
         }
-        _ => unimplemented!(),
     }
 }
 

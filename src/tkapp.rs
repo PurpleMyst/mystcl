@@ -64,6 +64,10 @@ impl TkApp {
             })
             .map_err(Into::into)
     }
+
+    fn deletecommand(&mut self, name: &str) -> PyResult<()> {
+        self.interp.deletecommand(name).map_err(Into::into)
+    }
 }
 
 #[cfg(test)]

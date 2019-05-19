@@ -7,11 +7,11 @@ pub type Command = fn(&CommandData, &[&CStr]) -> Result<TclObj, TclObj>;
 
 pub struct CommandData {
     pub interp: TclInterp,
+    pub name: CString,
     pub cmd: Command,
     pub data: Box<Any>,
 }
 
-#[allow(dead_code)]
 extern "C" fn cmd_callback(
     client_data: *mut c_void,
     _interp: *mut tcl_sys::Tcl_Interp,
@@ -43,6 +43,19 @@ extern "C" fn cmd_callback(
     }
 }
 
+extern "C" fn cmd_deleter(client_data: *mut c_void) {
+    let client_data = unsafe { &mut *(client_data as *mut CommandData) };
+    let old = client_data
+        .interp
+        .0
+        .lock()
+        .unwrap()
+        .commands
+        .remove(&client_data.name);
+
+    debug_assert!(old.is_some());
+}
+
 impl TclInterp {
     pub fn createcommand(
         &mut self,
@@ -62,6 +75,7 @@ impl TclInterp {
 
         let command_data = CommandData {
             interp: self.clone(),
+            name: name.clone(),
             cmd,
             data,
         };
@@ -73,7 +87,7 @@ impl TclInterp {
                 name.as_ptr(),
                 Some(cmd_callback),
                 command_data,
-                None,
+                Some(cmd_deleter),
             )
         };
 
@@ -90,6 +104,23 @@ impl TclInterp {
         debug_assert!(old.is_none());
 
         Ok(())
+    }
+
+    pub fn deletecommand(&mut self, name: &str) -> Result<(), TclError> {
+        let name =
+            CString::new(name).map_err(|_| TclError::new("name must not contain NUL bytes."))?;
+
+        let res = unsafe { tcl_sys::Tcl_DeleteCommand(self.interp_ptr()?, name.as_ptr()) };
+
+        match res {
+            0 => Ok(()),
+            -1 => Err(TclError::new(format!(
+                "Command with name {:?} does not exist.",
+                name
+            ))),
+
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -133,5 +164,17 @@ mod tests {
                 .unwrap(),
             "spam ham spam spam ham ham spam"
         );
+    }
+
+    #[test]
+    fn test_deletecommand() {
+        let mut interp = TclInterp::new().unwrap();
+        interp
+            .createcommand("foo", Box::new("bar"), |_, _| Ok("hi".to_tcl_obj()))
+            .unwrap();
+
+        assert!(interp.eval("foo".to_owned()).is_ok());
+        interp.deletecommand("foo").unwrap();
+        assert!(interp.eval("foo".to_owned()).is_err());
     }
 }

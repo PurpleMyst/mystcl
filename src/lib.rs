@@ -1,9 +1,10 @@
-#![deny(unused_must_use)]
+#![deny(unused_imports, unused_must_use)]
 
 use pyo3::{prelude::*, wrap_pyfunction};
 
 mod exceptions;
 mod tclinterp;
+mod tclobj;
 mod tkapp;
 mod wrappers;
 

@@ -3,8 +3,6 @@ use std::{any::Any, os::raw::*};
 
 use pyo3::prelude::*;
 
-use crate::wrappers::TclObj;
-
 use super::*;
 
 pub type Command = fn(&CommandData, &[&CStr]) -> Result<TclObj, TclObj>;

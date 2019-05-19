@@ -3,7 +3,7 @@ use pyo3::{
     types::{PyAny, PyString, PyTuple},
 };
 
-use crate::{tclinterp::TclInterp, wrappers::TclObj};
+use crate::{tclinterp::TclInterp, tclobj::TclObj};
 
 #[pyclass]
 pub struct TkApp {

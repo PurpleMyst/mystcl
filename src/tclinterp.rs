@@ -8,10 +8,7 @@ use std::{
     sync::Mutex,
 };
 
-use crate::{
-    exceptions::TclError,
-    wrappers::{Objv, TclObj},
-};
+use crate::{exceptions::TclError, tclobj::TclObj, wrappers::Objv};
 
 use pyo3::{
     prelude::*,

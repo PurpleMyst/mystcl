@@ -1,8 +1,6 @@
 // TODO: Do something with deleters.
 use std::{any::Any, os::raw::*};
 
-use pyo3::prelude::*;
-
 use super::*;
 
 pub type Command = fn(&CommandData, &[&CStr]) -> Result<TclObj, TclObj>;
@@ -46,11 +44,17 @@ extern "C" fn cmd_callback(
 }
 
 impl TclInterp {
-    pub fn createcommand(&mut self, name: &str, data: Box<Any>, cmd: Command) -> PyResult<()> {
-        let name = CString::new(name)?;
+    pub fn createcommand(
+        &mut self,
+        name: &str,
+        data: Box<Any>,
+        cmd: Command,
+    ) -> Result<(), TclError> {
+        let name = CString::new(name)
+            .map_err(|_| TclError("name must not contain NUL bytes.".to_owned()))?;
 
         if self.0.lock().unwrap().commands.contains_key(&name) {
-            return Err(TclError::py_err(format!(
+            return Err(TclError(format!(
                 "Command with name {:?} already exists.",
                 name
             )));
@@ -74,7 +78,7 @@ impl TclInterp {
         };
 
         if res.is_null() {
-            return Err(TclError::py_err("Tcl_CreateCommand returned NULL"));
+            return Err(TclError("Tcl_CreateCommand returned NULL".to_owned()));
         }
 
         let old = self
@@ -126,10 +130,6 @@ mod tests {
         assert_eq!(
             interp
                 .eval("ham spam ham spam spam ham ham spam".to_string())
-                .map_err(|err| {
-                    let gil = Python::acquire_gil();
-                    crate::errmsg(gil.python(), &err)
-                })
                 .unwrap(),
             "spam ham spam spam ham ham spam"
         );

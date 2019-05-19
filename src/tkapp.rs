@@ -24,19 +24,19 @@ impl TkApp {
 impl TkApp {
     #[args(args = "*")]
     fn call(&mut self, args: &PyTuple) -> PyResult<String> {
-        self.interp.call(args)
+        self.interp.call(args).map_err(Into::into)
     }
 
     fn eval(&mut self, code: String) -> PyResult<String> {
-        self.interp.eval(code)
+        self.interp.eval(code).map_err(Into::into)
     }
 
     fn splitlist(&mut self, arg: &PyString) -> PyResult<Vec<String>> {
-        self.interp.splitlist(arg)
+        self.interp.splitlist(arg).map_err(Into::into)
     }
 
     fn delete(&mut self) -> PyResult<()> {
-        self.interp.delete()
+        self.interp.delete().map_err(Into::into)
     }
 
     fn createcommand(&mut self, name: &str, func: Py<PyAny>) -> PyResult<()> {
@@ -62,6 +62,7 @@ impl TkApp {
                     .map(|v| v.as_ref(py).to_tcl_obj())
                     .map_err(|e| crate::errmsg(py, &e).to_tcl_obj())
             })
+            .map_err(Into::into)
     }
 }
 

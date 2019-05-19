@@ -14,8 +14,6 @@ use crate::{
     wrappers::Objv,
 };
 
-use pyo3::{prelude::*, types::PyAny};
-
 mod createcommand;
 use createcommand::*;
 
@@ -28,12 +26,12 @@ struct TclInterpData {
 pub struct TclInterp(Rc<Mutex<TclInterpData>>);
 
 impl TclInterp {
-    pub fn new() -> PyResult<Self> {
+    pub fn new() -> Result<Self, TclError> {
         unsafe {
             let interp = Rc::new(Mutex::new(TclInterpData {
                 interp: Some(
                     NonNull::new(tcl_sys::Tcl_CreateInterp())
-                        .ok_or_else(|| TclError::py_err("Tcl_CreateInterp returned NULL"))?,
+                        .ok_or_else(|| TclError("Tcl_CreateInterp returned NULL".to_owned()))?,
                 ),
                 commands: Default::default(),
             }));
@@ -46,7 +44,7 @@ impl TclInterp {
         }
     }
 
-    pub fn init_tk(&mut self) -> PyResult<()> {
+    pub fn init_tk(&mut self) -> Result<(), TclError> {
         self.check_statuscode(unsafe { tcl_sys::Tk_Init(self.interp_ptr()?) })?;
 
         let id = &self as *const _ as usize;
@@ -59,26 +57,28 @@ impl TclInterp {
         Ok(())
     }
 
-    pub(crate) fn interp_ptr(&self) -> PyResult<*mut tcl_sys::Tcl_Interp> {
+    pub(crate) fn interp_ptr(&self) -> Result<*mut tcl_sys::Tcl_Interp, TclError> {
         self.0
             .lock()
             .unwrap()
             .interp
-            .ok_or_else(|| TclError::py_err("Tried to use interpreter after deletion"))
+            .ok_or_else(|| TclError("Tried to use interpreter after deletion".to_owned()))
             .map(|ptr| ptr.as_ptr())
     }
 
-    pub fn eval(&mut self, code: String) -> PyResult<String> {
-        let c_code = CString::new(code)?;
+    pub fn eval(&mut self, code: String) -> Result<String, TclError> {
+        let c_code = CString::new(code)
+            .map_err(|_| TclError("code must not contain NUL bytes.".to_owned()))?;
 
         self.check_statuscode(unsafe { tcl_sys::Tcl_Eval(self.interp_ptr()?, c_code.as_ptr()) })?;
 
         self.get_result().map(|obj| obj.to_string())
     }
 
-    pub fn call<'a, I>(&mut self, it: I) -> PyResult<String>
+    pub fn call<'a, I>(&mut self, it: I) -> Result<String, TclError>
     where
-        I: IntoIterator<Item = &'a PyAny>,
+        I: IntoIterator,
+        I::Item: ToTclObj,
     {
         let objv = Objv::new(it);
 
@@ -89,29 +89,29 @@ impl TclInterp {
         self.get_result().map(|obj| obj.to_string())
     }
 
-    pub fn get_result(&self) -> PyResult<TclObj> {
+    pub fn get_result(&self) -> Result<TclObj, TclError> {
         NonNull::new(unsafe { tcl_sys::Tcl_GetObjResult(self.interp_ptr()?) })
-            .ok_or_else(|| TclError::py_err("Tcl_GetObjResult returned NULL"))
+            .ok_or_else(|| TclError("Tcl_GetObjResult returned NULL".to_owned()))
             .map(TclObj::new)
     }
 
-    pub fn set_result(&mut self, obj: TclObj) -> PyResult<()> {
+    pub fn set_result(&mut self, obj: TclObj) -> Result<(), TclError> {
         unsafe { tcl_sys::Tcl_SetObjResult(self.interp_ptr()?, obj.as_ptr()) }
         Ok(())
     }
 
-    pub fn get_error(&self) -> PyResult<PyErr> {
-        Ok(TclError::py_err(self.get_result()?.to_string()))
+    pub fn get_error(&self) -> Result<TclError, TclError> {
+        Ok(TclError(self.get_result()?.to_string()))
     }
 
-    pub fn check_statuscode(&self, value: c_int) -> PyResult<()> {
+    pub fn check_statuscode(&self, value: c_int) -> Result<(), TclError> {
         match value as c_uint {
             tcl_sys::TCL_OK => Ok(()),
             _ => Err(self.get_error()?),
         }
     }
 
-    pub fn splitlist(&mut self, arg: impl ToTclObj) -> PyResult<Vec<String>> {
+    pub fn splitlist(&mut self, arg: impl ToTclObj) -> Result<Vec<String>, TclError> {
         let obj = arg.to_tcl_obj();
 
         let mut objc: c_int = 0;
@@ -127,7 +127,7 @@ impl TclInterp {
             .collect::<Vec<_>>())
     }
 
-    pub fn delete(&mut self) -> PyResult<()> {
+    pub fn delete(&mut self) -> Result<(), TclError> {
         unsafe { tcl_sys::Tcl_DeleteInterp(self.interp_ptr()?) };
         self.0.lock().unwrap().interp = None;
         Ok(())

@@ -104,7 +104,7 @@ mod tests {
             .createcommand("foo", Box::new("bar".to_string()), |data, _args| {
                 data.data
                     .downcast_ref::<String>()
-                    .and_then(|s| TclObj::try_from_string(s.to_owned()))
+                    .map(TclObj::from)
                     .ok_or_else(|| unreachable!())
             })
             .unwrap();
@@ -122,9 +122,7 @@ mod tests {
                     .map(|s| s.to_str().to_owned())
                     .collect::<Result<Vec<_>, _>>()
                     .or_else(|_| unreachable!())
-                    .and_then(|v| {
-                        TclObj::try_from_string(v.join(" ")).ok_or_else(|| unreachable!())
-                    })
+                    .map(|v| TclObj::from(v.join(" ")))
             })
             .unwrap();
         assert_eq!(

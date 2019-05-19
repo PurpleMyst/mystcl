@@ -106,7 +106,7 @@ impl TclInterp {
     }
 
     pub fn set_result(&mut self, obj: TclObj) -> PyResult<()> {
-        unsafe { tcl_sys::Tcl_SetObjResult(self.interp_ptr()?, obj.ptr) }
+        unsafe { tcl_sys::Tcl_SetObjResult(self.interp_ptr()?, obj.as_ptr()) }
         Ok(())
     }
 
@@ -122,20 +122,18 @@ impl TclInterp {
     }
 
     pub(crate) fn make_string_obj(&self, arg: &PyAny) -> PyResult<TclObj> {
-        let obj = if let Ok(s) = arg.downcast_ref::<PyString>() {
-            TclObj::try_from_pystring(s)
+        if let Ok(s) = arg.downcast_ref::<PyString>() {
+            Ok(TclObj::from(s.as_bytes()))
         } else if let Ok(t) = arg.downcast_ref::<PyTuple>() {
             let objv = Objv::new(self, t)?;
 
-            TclObj::new(unsafe { tcl_sys::Tcl_NewListObj(objv.len(), objv.as_ptr()) })
-        } else {
-            return Err(pyo3::exceptions::TypeError::py_err("Expected str or tuple"));
-        };
+            let ptr = unsafe { tcl_sys::Tcl_NewListObj(objv.len(), objv.as_ptr()) };
+            let ptr = NonNull::new(ptr)
+                .ok_or_else(|| TclError::py_err("Tcl_NewListObj returned NULL"))?;
 
-        if let Some(obj) = obj {
-            Ok(obj)
+            Ok(TclObj::new(ptr))
         } else {
-            Err(self.get_error()?)
+            Err(pyo3::exceptions::TypeError::py_err("Expected str or tuple"))
         }
     }
 
@@ -146,7 +144,7 @@ impl TclInterp {
         let mut objv: *mut *mut tcl_sys::Tcl_Obj = std::ptr::null_mut();
 
         self.check_statuscode(unsafe {
-            tcl_sys::Tcl_ListObjGetElements(self.interp_ptr()?, obj.ptr, &mut objc, &mut objv)
+            tcl_sys::Tcl_ListObjGetElements(self.interp_ptr()?, obj.as_ptr(), &mut objc, &mut objv)
         })?;
 
         unsafe { slice::from_raw_parts(objv, objc as usize) }

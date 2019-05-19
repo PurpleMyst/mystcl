@@ -75,7 +75,7 @@ impl TclInterp {
 
         self.check_statuscode(unsafe { tcl_sys::Tcl_Eval(self.interp_ptr()?, c_code.as_ptr()) })?;
 
-        self.get_result()
+        self.get_result().map(|obj| obj.to_string())
     }
 
     pub fn call<'a, I>(&mut self, objv: I) -> PyResult<String>
@@ -88,21 +88,13 @@ impl TclInterp {
             tcl_sys::Tcl_EvalObjv(self.interp_ptr()?, objv.len(), objv.as_ptr(), 0)
         })?;
 
-        self.get_result()
+        self.get_result().map(|obj| obj.to_string())
     }
 
-    fn get_string(&self, ptr: NonNull<tcl_sys::Tcl_Obj>) -> PyResult<String> {
-        unsafe {
-            Ok(CStr::from_ptr(tcl_sys::Tcl_GetString(ptr.as_ptr()))
-                .to_str()?
-                .to_owned())
-        }
-    }
-
-    pub fn get_result(&self) -> PyResult<String> {
+    pub fn get_result(&self) -> PyResult<TclObj> {
         NonNull::new(unsafe { tcl_sys::Tcl_GetObjResult(self.interp_ptr()?) })
             .ok_or_else(|| TclError::py_err("Tcl_GetObjResult returned NULL"))
-            .and_then(|ptr| self.get_string(ptr))
+            .map(TclObj::new)
     }
 
     pub fn set_result(&mut self, obj: TclObj) -> PyResult<()> {
@@ -111,7 +103,7 @@ impl TclInterp {
     }
 
     pub fn get_error(&self) -> PyResult<PyErr> {
-        Ok(TclError::py_err(self.get_result()?))
+        Ok(TclError::py_err(self.get_result()?.to_string()))
     }
 
     pub fn check_statuscode(&self, value: c_int) -> PyResult<()> {
@@ -147,11 +139,10 @@ impl TclInterp {
             tcl_sys::Tcl_ListObjGetElements(self.interp_ptr()?, obj.as_ptr(), &mut objc, &mut objv)
         })?;
 
-        unsafe { slice::from_raw_parts(objv, objc as usize) }
+        Ok(unsafe { slice::from_raw_parts(objv, objc as usize) }
             .into_iter()
-            .map(|&ptr| NonNull::new(ptr).unwrap())
-            .map(|ptr| self.get_string(ptr))
-            .collect::<Result<Vec<_>, _>>()
+            .map(|&ptr| TclObj::new(NonNull::new(ptr).unwrap()).to_string())
+            .collect::<Vec<_>>())
     }
 
     pub fn delete(&mut self) -> PyResult<()> {

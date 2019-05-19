@@ -7,11 +7,11 @@ use pyo3::{
 
 use crate::tclinterp::TclInterp;
 
-pub struct TclObjWrapper {
+pub struct TclObj {
     pub ptr: *mut tcl_sys::Tcl_Obj,
 }
 
-impl TclObjWrapper {
+impl TclObj {
     pub fn new(ptr: *mut tcl_sys::Tcl_Obj) -> Option<Self> {
         if ptr.is_null() {
             None
@@ -19,7 +19,7 @@ impl TclObjWrapper {
             unsafe {
                 (*ptr).refCount += 1;
             }
-            Some(Self { ptr })
+            Some(TclObj { ptr })
         }
     }
 
@@ -41,7 +41,7 @@ impl TclObjWrapper {
     }
 }
 
-impl std::fmt::Debug for TclObjWrapper {
+impl std::fmt::Debug for TclObj {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         unsafe {
             f.debug_struct("TclObjWrapper")
@@ -56,7 +56,7 @@ impl std::fmt::Debug for TclObjWrapper {
     }
 }
 
-impl Drop for TclObjWrapper {
+impl Drop for TclObj {
     fn drop(&mut self) {
         unsafe {
             (*self.ptr).refCount -= 1;
@@ -64,7 +64,7 @@ impl Drop for TclObjWrapper {
     }
 }
 
-pub struct Objv(Vec<TclObjWrapper>, Vec<*mut tcl_sys::Tcl_Obj>);
+pub struct Objv(Vec<TclObj>, Vec<*mut tcl_sys::Tcl_Obj>);
 
 impl Objv {
     pub fn new<'a, I>(app: &TclInterp, it: I) -> PyResult<Self>

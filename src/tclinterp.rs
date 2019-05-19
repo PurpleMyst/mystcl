@@ -10,7 +10,7 @@ use std::{
 
 use crate::{
     exceptions::TclError,
-    wrappers::{Objv, TclObjWrapper},
+    wrappers::{Objv, TclObj},
 };
 
 use pyo3::{
@@ -105,7 +105,7 @@ impl TclInterp {
             .and_then(|ptr| self.get_string(ptr))
     }
 
-    pub fn set_result(&mut self, obj: TclObjWrapper) -> PyResult<()> {
+    pub fn set_result(&mut self, obj: TclObj) -> PyResult<()> {
         unsafe { tcl_sys::Tcl_SetObjResult(self.interp_ptr()?, obj.ptr) }
         Ok(())
     }
@@ -121,13 +121,13 @@ impl TclInterp {
         }
     }
 
-    pub(crate) fn make_string_obj(&self, arg: &PyAny) -> PyResult<TclObjWrapper> {
+    pub(crate) fn make_string_obj(&self, arg: &PyAny) -> PyResult<TclObj> {
         let obj = if let Ok(s) = arg.downcast_ref::<PyString>() {
-            TclObjWrapper::try_from_pystring(s)
+            TclObj::try_from_pystring(s)
         } else if let Ok(t) = arg.downcast_ref::<PyTuple>() {
             let objv = Objv::new(self, t)?;
 
-            TclObjWrapper::new(unsafe { tcl_sys::Tcl_NewListObj(objv.len(), objv.as_ptr()) })
+            TclObj::new(unsafe { tcl_sys::Tcl_NewListObj(objv.len(), objv.as_ptr()) })
         } else {
             return Err(pyo3::exceptions::TypeError::py_err("Expected str or tuple"));
         };

@@ -3,11 +3,11 @@ use std::{any::Any, os::raw::*};
 
 use pyo3::prelude::*;
 
-use crate::wrappers::TclObjWrapper;
+use crate::wrappers::TclObj;
 
 use super::*;
 
-pub type Command = fn(&CommandData, &[&CStr]) -> Result<TclObjWrapper, TclObjWrapper>;
+pub type Command = fn(&CommandData, &[&CStr]) -> Result<TclObj, TclObj>;
 
 pub struct CommandData {
     pub interp: TclInterp,
@@ -104,7 +104,7 @@ mod tests {
             .createcommand("foo", Box::new("bar".to_string()), |data, _args| {
                 data.data
                     .downcast_ref::<String>()
-                    .and_then(|s| TclObjWrapper::try_from_string(s.to_owned()))
+                    .and_then(|s| TclObj::try_from_string(s.to_owned()))
                     .ok_or_else(|| unreachable!())
             })
             .unwrap();
@@ -123,7 +123,7 @@ mod tests {
                     .collect::<Result<Vec<_>, _>>()
                     .or_else(|_| unreachable!())
                     .and_then(|v| {
-                        TclObjWrapper::try_from_string(v.join(" ")).ok_or_else(|| unreachable!())
+                        TclObj::try_from_string(v.join(" ")).ok_or_else(|| unreachable!())
                     })
             })
             .unwrap();

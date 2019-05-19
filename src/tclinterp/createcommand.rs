@@ -27,6 +27,7 @@ extern "C" fn cmd_callback(
     let args = unsafe {
         slice::from_raw_parts(argv, argc as usize)
             .into_iter()
+            .skip(1)
             .map(|&s| CStr::from_ptr(s))
             .collect::<Vec<_>>()
     };
@@ -134,7 +135,7 @@ mod tests {
                     crate::errmsg(gil.python(), &err)
                 })
                 .unwrap(),
-            "ham spam ham spam spam ham ham spam"
+            "spam ham spam spam ham ham spam"
         );
     }
 }

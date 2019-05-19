@@ -119,7 +119,7 @@ mod tests {
             app.call(&pytuple!(py, ["foo", "bar", "baz"]))
                 .map_err(|e| crate::errmsg(py, &e))
                 .unwrap(),
-            "('foo', 'bar', 'baz')"
+            "('bar', 'baz')"
         );
     }
 }

@@ -27,6 +27,10 @@ impl TkApp {
         self.interp.call(args)
     }
 
+    fn eval(&mut self, code: String) -> PyResult<String> {
+        self.interp.eval(code)
+    }
+
     fn delete(&mut self) -> PyResult<()> {
         self.interp.delete()
     }
@@ -101,6 +105,14 @@ mod tests {
         } else {
             panic!("TkApp::call did not return Err(_) after TkApp::delete");
         }
+    }
+
+    #[test]
+    fn test_eval() {
+        assert_eq!(
+            TkApp::new().unwrap().eval("return 42".to_owned()).unwrap(),
+            "42"
+        );
     }
 
     #[test]

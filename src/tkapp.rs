@@ -1,7 +1,6 @@
-use pyo3::{
-    prelude::*,
-    types::{PyAny, PyString, PyTuple},
-};
+use std::sync::Once;
+
+use pyo3::{prelude::*, types::*};
 
 use crate::{tclinterp::TclInterp, tclobj::ToTclObj};
 
@@ -10,8 +9,12 @@ pub struct TkApp {
     interp: TclInterp,
 }
 
+static LOGGER_INIT: Once = Once::new();
+
 impl TkApp {
     pub fn new() -> PyResult<Self> {
+        LOGGER_INIT.call_once(|| env_logger::init());
+
         let mut inst = Self {
             interp: TclInterp::new()?,
         };

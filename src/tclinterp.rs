@@ -8,6 +8,8 @@ use std::{
     sync::Mutex,
 };
 
+use log::{debug, trace};
+
 use crate::{
     exceptions::TclError,
     tclobj::{TclObj, ToTclObj},
@@ -30,6 +32,7 @@ impl TclInterp {
     pub fn new() -> Result<Self, TclError> {
         unsafe {
             let exit_var_name = format!("exit_var_{}", rand::random::<u64>());
+            debug!("Creating exit variable {:?}", exit_var_name);
 
             let interp = Rc::new(Mutex::new(TclInterpData {
                 interp: Some(
@@ -72,6 +75,7 @@ impl TclInterp {
             .map(NonNull::as_ptr)?;
 
         if unsafe { tcl_sys::Tcl_InterpDeleted(ptr) } != 0 {
+            debug!("Interpreter was deleted by someone else");
             self.0.lock().unwrap().interp = None;
             Err(TclError::new("Tried to use interpreter after deletion"))
         } else {
@@ -80,12 +84,15 @@ impl TclInterp {
     }
 
     pub fn eval(&mut self, code: String) -> Result<String, TclError> {
+        trace!("Evaluating code {:?}", code);
+
         let c_code =
             CString::new(code).map_err(|_| TclError::new("code must not contain NUL bytes."))?;
 
         self.check_statuscode(unsafe { tcl_sys::Tcl_Eval(self.interp_ptr()?, c_code.as_ptr()) })?;
 
-        self.get_result().map(|obj| obj.to_string())
+        let result = self.get_result()?;
+        Ok(result.to_string())
     }
 
     pub fn call<I>(&mut self, it: I) -> Result<String, TclError>
@@ -94,21 +101,27 @@ impl TclInterp {
         I::Item: ToTclObj,
     {
         let objv = Objv::new(it);
+        trace!("Calling {:?}", objv);
 
         self.check_statuscode(unsafe {
             tcl_sys::Tcl_EvalObjv(self.interp_ptr()?, objv.len(), objv.as_ptr(), 0)
         })?;
 
-        self.get_result().map(|obj| obj.to_string())
+        let result = self.get_result()?;
+        Ok(result.to_string())
     }
 
     pub fn get_result(&self) -> Result<TclObj, TclError> {
-        NonNull::new(unsafe { tcl_sys::Tcl_GetObjResult(self.interp_ptr()?) })
+        let result = NonNull::new(unsafe { tcl_sys::Tcl_GetObjResult(self.interp_ptr()?) })
             .ok_or_else(|| TclError::new("Tcl_GetObjResult returned NULL"))
-            .map(TclObj::new)
+            .map(TclObj::new)?;
+
+        trace!("Result: {:#?}", result);
+        Ok(result)
     }
 
     pub fn set_result(&mut self, obj: TclObj) -> Result<(), TclError> {
+        trace!("Setting result to {:?}", obj);
         unsafe { tcl_sys::Tcl_SetObjResult(self.interp_ptr()?, obj.as_ptr()) }
         Ok(())
     }

@@ -2,6 +2,7 @@ use std::os::raw::*;
 
 use crate::tclobj::{TclObj, ToTclObj};
 
+#[derive(Debug)]
 pub struct Objv(Vec<TclObj>, Vec<*mut tcl_sys::Tcl_Obj>);
 
 impl Objv {

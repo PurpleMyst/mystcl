@@ -29,8 +29,7 @@ pub struct TclInterp(Rc<Mutex<TclInterpData>>);
 impl TclInterp {
     pub fn new() -> Result<Self, TclError> {
         unsafe {
-            // FIXME: custom var name for each interpreter
-            let exit_var_name = format!("exit_var_{}", 172380);
+            let exit_var_name = format!("exit_var_{}", rand::random::<u64>());
 
             let interp = Rc::new(Mutex::new(TclInterpData {
                 interp: Some(

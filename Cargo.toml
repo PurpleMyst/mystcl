@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 [dependencies]
 tcl-sys = { path = "./tcl-sys/" }
 pyo3 = { version = "0.7.0-alpha.1" }
+rand = "0.6.5"
 
 [features]
 extension-module = ["pyo3/extension-module"]

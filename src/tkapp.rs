@@ -40,6 +40,7 @@ impl TkApp {
     }
 
     fn createcommand(&mut self, name: &str, func: Py<PyAny>) -> PyResult<()> {
+        // TODO: Better errors here.
         self.interp
             .createcommand(name, Box::new(func), |cmd_data, args| {
                 let gil = Python::acquire_gil();
@@ -67,6 +68,10 @@ impl TkApp {
 
     fn deletecommand(&mut self, name: &str) -> PyResult<()> {
         self.interp.deletecommand(name).map_err(Into::into)
+    }
+
+    fn mainloop(&mut self, _arg: &PyAny) -> PyResult<()> {
+        self.interp.mainloop().map_err(Into::into)
     }
 }
 

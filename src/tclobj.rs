@@ -66,7 +66,7 @@ impl ToTclObj for &PyAny {
         } else if let Ok(value) = self.downcast_ref::<PyTuple>() {
             value.to_tcl_obj()
         } else {
-            unimplemented!()
+            unimplemented!("ToTclObj::to_tcl_obj for {:?}", self)
         }
     }
 }

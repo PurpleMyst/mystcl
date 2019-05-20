@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     ffi::{CStr, CString},
     os::raw::*,
-    ptr::NonNull,
+    ptr::{self, NonNull},
     rc::Rc,
     slice,
     sync::Mutex,
@@ -20,6 +20,7 @@ use createcommand::*;
 struct TclInterpData {
     interp: Option<NonNull<tcl_sys::Tcl_Interp>>,
     commands: HashMap<CString, *mut CommandData>,
+    exit_var_name: String,
 }
 
 #[derive(Clone)]
@@ -28,15 +29,22 @@ pub struct TclInterp(Rc<Mutex<TclInterpData>>);
 impl TclInterp {
     pub fn new() -> Result<Self, TclError> {
         unsafe {
+            // FIXME: custom var name for each interpreter
+            let exit_var_name = format!("exit_var_{}", 172380);
+
             let interp = Rc::new(Mutex::new(TclInterpData {
                 interp: Some(
                     NonNull::new(tcl_sys::Tcl_CreateInterp())
                         .ok_or_else(|| TclError::new("Tcl_CreateInterp returned NULL"))?,
                 ),
                 commands: Default::default(),
+                exit_var_name: exit_var_name.clone(),
             }));
 
-            let inst = Self(interp);
+            let mut inst = Self(interp);
+
+            inst.eval(String::from("rename exit {}"))?;
+            inst.eval(format!("set {} false", exit_var_name))?;
 
             inst.check_statuscode(tcl_sys::Tcl_Init(inst.interp_ptr()?))?;
 
@@ -47,11 +55,9 @@ impl TclInterp {
     pub fn init_tk(&mut self) -> Result<(), TclError> {
         self.check_statuscode(unsafe { tcl_sys::Tk_Init(self.interp_ptr()?) })?;
 
-        let id = &self as *const _ as usize;
-        let exit_var_name = format!("exit_var_{}", id);
+        let exit_var_name = self.0.lock().unwrap().exit_var_name.clone();
+
         self.eval(String::from("package require Tk"))?;
-        self.eval(String::from("rename exit {}"))?;
-        self.eval(format!("set {} false", exit_var_name))?;
         self.eval(format!("bind . <Destroy> {{ set {} true }}", exit_var_name))?;
 
         Ok(())
@@ -130,6 +136,33 @@ impl TclInterp {
     pub fn delete(&mut self) -> Result<(), TclError> {
         unsafe { tcl_sys::Tcl_DeleteInterp(self.interp_ptr()?) };
         self.0.lock().unwrap().interp = None;
+        Ok(())
+    }
+
+    fn get_var(&self, name: String) -> Result<TclObj, TclError> {
+        let name =
+            CString::new(name).map_err(|_| TclError::new("name must not contain NUL bytes."))?;
+
+        Ok(TclObj::new(unsafe {
+            NonNull::new(tcl_sys::Tcl_GetVar2Ex(
+                self.interp_ptr()?,
+                name.as_ptr(),
+                ptr::null(),
+                0,
+            ))
+            .ok_or_else(|| TclError::new(format!("Could not get variable with name {:?}", name)))?
+        }))
+    }
+
+    pub fn mainloop(&mut self) -> Result<(), TclError> {
+        let exit_var_name = self.0.lock().unwrap().exit_var_name.clone();
+
+        // FIXME: Don't allocate on every iteration.
+        while self.get_var(exit_var_name.clone())?.to_string() != "true" {
+            let res = unsafe { tcl_sys::Tcl_DoOneEvent(0) };
+            assert_eq!(res, 1);
+        }
+
         Ok(())
     }
 }

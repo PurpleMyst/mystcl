@@ -35,6 +35,12 @@ impl TkApp {
         self.interp.splitlist(arg).map_err(Into::into)
     }
 
+    fn getboolean(&mut self, arg: &PyString) -> PyResult<bool> {
+        self.interp
+            .getboolean(arg.to_string()?.to_string())
+            .map_err(Into::into)
+    }
+
     fn delete(&mut self) -> PyResult<()> {
         self.interp.delete().map_err(Into::into)
     }

@@ -124,7 +124,7 @@ impl TclInterp {
         }
     }
 
-    pub fn splitlist(&mut self, arg: impl ToTclObj) -> Result<Vec<String>, TclError> {
+    pub fn splitlist(&self, arg: impl ToTclObj) -> Result<Vec<String>, TclError> {
         let obj = arg.to_tcl_obj();
 
         let mut objc: c_int = 0;
@@ -138,6 +138,23 @@ impl TclInterp {
             .iter()
             .map(|&ptr| TclObj::new(NonNull::new(ptr).unwrap()).to_string())
             .collect::<Vec<_>>())
+    }
+
+    pub fn getboolean(&self, s: String) -> Result<bool, TclError> {
+        let s =
+            CString::new(s).map_err(|_| TclError::new("Argument must not contain NUL bytes."))?;
+
+        let mut value: c_int = Default::default();
+
+        self.check_statuscode(unsafe {
+            tcl_sys::Tcl_GetBoolean(self.interp_ptr()?, s.as_ptr(), &mut value)
+        })?;
+
+        if value == 0 {
+            Ok(false)
+        } else {
+            Ok(true)
+        }
     }
 
     pub fn delete(&mut self) -> Result<(), TclError> {

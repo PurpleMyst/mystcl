@@ -63,12 +63,20 @@ impl TclInterp {
     }
 
     pub(crate) fn interp_ptr(&self) -> Result<*mut tcl_sys::Tcl_Interp, TclError> {
-        self.0
+        let ptr = self
+            .0
             .lock()
             .unwrap()
             .interp
             .ok_or_else(|| TclError::new("Tried to use interpreter after deletion"))
-            .map(NonNull::as_ptr)
+            .map(NonNull::as_ptr)?;
+
+        if unsafe { tcl_sys::Tcl_InterpDeleted(ptr) } != 0 {
+            self.0.lock().unwrap().interp = None;
+            Err(TclError::new("Tried to use interpreter after deletion"))
+        } else {
+            Ok(ptr)
+        }
     }
 
     pub fn eval(&mut self, code: String) -> Result<String, TclError> {

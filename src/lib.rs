@@ -38,7 +38,8 @@ fn create() -> PyResult<Py<TkApp>> {
 }
 
 #[pymodule]
-fn mystcl(_py: Python, m: &PyModule) -> PyResult<()> {
+fn mystcl(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(create))?;
+    m.add("TclError", py.get_type::<exceptions::py::TclError>())?;
     Ok(())
 }

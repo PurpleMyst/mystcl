@@ -9,7 +9,7 @@ impl TclError {
     }
 }
 
-mod py {
+pub(super) mod py {
     use pyo3::create_exception;
 
     create_exception!(mystcl, TclError, pyo3::exceptions::Exception);

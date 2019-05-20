@@ -65,6 +65,17 @@ impl TclInterp {
         Ok(())
     }
 
+    fn deleted(&self) -> bool {
+        match self.0.lock().unwrap().interp {
+            Some(ptr) => {
+                let result = unsafe { tcl_sys::Tcl_InterpDeleted(ptr.as_ptr()) };
+                result != 0
+            }
+
+            None => true,
+        }
+    }
+
     pub(crate) fn interp_ptr(&self) -> Result<*mut tcl_sys::Tcl_Interp, TclError> {
         let ptr = self
             .0

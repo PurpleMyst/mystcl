@@ -32,12 +32,23 @@ extern "C" fn cmd_callback(
 
     match res {
         Ok(value) => {
-            client_data.interp.set_result(value).unwrap();
+            if !client_data.interp.deleted() {
+                client_data
+                    .interp
+                    .set_result(value)
+                    .expect("Could not set successful result from command");
+            }
+
             tcl_sys::TCL_OK as c_int
         }
 
         Err(value) => {
-            client_data.interp.set_result(value).unwrap();
+            if !client_data.interp.deleted() {
+                client_data
+                    .interp
+                    .set_result(value)
+                    .expect("Could not set failing result from command")
+            }
             tcl_sys::TCL_ERROR as c_int
         }
     }

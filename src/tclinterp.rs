@@ -139,10 +139,7 @@ impl TclInterp {
         Ok(())
     }
 
-    fn get_var(&self, name: String) -> Result<TclObj, TclError> {
-        let name =
-            CString::new(name).map_err(|_| TclError::new("name must not contain NUL bytes."))?;
-
+    fn get_var(&self, name: &CStr) -> Result<TclObj, TclError> {
         Ok(TclObj::new(unsafe {
             NonNull::new(tcl_sys::Tcl_GetVar2Ex(
                 self.interp_ptr()?,
@@ -155,10 +152,9 @@ impl TclInterp {
     }
 
     pub fn mainloop(&mut self) -> Result<(), TclError> {
-        let exit_var_name = self.0.lock().unwrap().exit_var_name.clone();
+        let exit_var_name = CString::new(self.0.lock().unwrap().exit_var_name.clone()).unwrap();
 
-        // FIXME: Don't allocate on every iteration.
-        while self.get_var(exit_var_name.clone())?.to_string() != "true" {
+        while self.get_var(exit_var_name.as_ref())?.to_string() != "true" {
             let res = unsafe { tcl_sys::Tcl_DoOneEvent(0) };
             assert_eq!(res, 1);
         }

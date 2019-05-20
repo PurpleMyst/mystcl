@@ -202,7 +202,7 @@ impl TclInterp {
     pub fn mainloop(&mut self) -> Result<(), TclError> {
         let exit_var_name = CString::new(self.0.lock().unwrap().exit_var_name.clone()).unwrap();
 
-        while self.get_var(exit_var_name.as_ref())?.to_string() != "true" {
+        while !self.deleted() && self.get_var(exit_var_name.as_ref())?.to_string() != "true" {
             let res = unsafe { tcl_sys::Tcl_DoOneEvent(0) };
             assert_eq!(res, 1);
         }

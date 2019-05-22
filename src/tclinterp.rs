@@ -17,8 +17,15 @@ use crate::{
     wrappers::Objv,
 };
 
+/// Access a TclInterpData attribute through the Rc<Mutex<_>>.
+macro_rules! attr {
+    ($self:ident.$name:ident) => {
+        $self.0.lock().unwrap().$name
+    };
+}
+
 mod createcommand;
-use createcommand::*;
+use createcommand::CommandData;
 
 mod preserve;
 use preserve::Preserve;
@@ -61,7 +68,7 @@ impl TclInterp {
         self.check_statuscode(unsafe { tcl_sys::Tk_Init(self.interp_ptr()?.as_ptr()) })?;
 
         // XXX: Can we remove this clone?
-        let exit_var_name = self.0.lock().unwrap().exit_var_name.clone();
+        let exit_var_name = attr!(self.exit_var_name).clone();
 
         self.eval(String::from("package require Tk"))?;
         self.eval(format!("bind . <Destroy> {{ set {} true }}", exit_var_name))?;
@@ -70,7 +77,7 @@ impl TclInterp {
     }
 
     fn deleted(&self) -> bool {
-        let ptr = self.0.lock().unwrap().interp.as_ptr();
+        let ptr = attr!(self.interp).as_ptr();
         (unsafe { tcl_sys::Tcl_InterpDeleted(ptr) }) != 0
     }
 
@@ -79,7 +86,7 @@ impl TclInterp {
             return Err(TclError::new("Tried to use interpreter after deletion"));
         }
 
-        Ok(Preserve::new(self.0.lock().unwrap().interp))
+        Ok(Preserve::new(attr!(self.interp)))
     }
 
     pub fn eval(&mut self, code: String) -> Result<String, TclError> {
@@ -189,7 +196,7 @@ impl TclInterp {
     }
 
     pub fn mainloop(&mut self) -> Result<(), TclError> {
-        let exit_var_name = CString::new(self.0.lock().unwrap().exit_var_name.clone()).unwrap();
+        let exit_var_name = CString::new(attr!(self.exit_var_name).clone()).unwrap();
 
         while !self.deleted() && self.get_var(exit_var_name.as_ref())?.to_string() != "true" {
             let res = unsafe { tcl_sys::Tcl_DoOneEvent(0) };

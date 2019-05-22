@@ -74,8 +74,9 @@ impl ToTclObj for &PyAny {
 impl std::fmt::Display for TclObj {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let s = unsafe { CStr::from_ptr(tcl_sys::Tcl_GetString(self.as_ptr())) };
+        let s = s.to_str().unwrap();
 
-        write!(f, "{}", s.to_str().unwrap())
+        write!(f, "{}", s)
     }
 }
 

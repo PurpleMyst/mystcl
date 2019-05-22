@@ -18,7 +18,9 @@ extern "C" fn cmd_callback(
     argc: c_int,
     argv: *mut *const c_char,
 ) -> c_int {
+    // XXX: We might need to forget this!!!
     let client_data = unsafe { &mut *(client_data as *mut CommandData) };
+    trace!("Calling command {:?}", client_data.name);
 
     let args = unsafe {
         slice::from_raw_parts(argv, argc as usize)
@@ -56,6 +58,8 @@ extern "C" fn cmd_callback(
 
 extern "C" fn cmd_deleter(client_data: *mut c_void) {
     let client_data = unsafe { &mut *(client_data as *mut CommandData) };
+    debug!("Deleting command {:?}", client_data.name);
+
     let old = client_data
         .interp
         .0
@@ -63,8 +67,7 @@ extern "C" fn cmd_deleter(client_data: *mut c_void) {
         .unwrap()
         .commands
         .remove(&client_data.name);
-
-    debug_assert!(old.is_some());
+    assert!(old.is_some());
 }
 
 impl TclInterp {
@@ -76,6 +79,9 @@ impl TclInterp {
     ) -> Result<(), TclError> {
         let name =
             CString::new(name).map_err(|_| TclError::new("name must not contain NUL bytes."))?;
+
+        debug!("Creating command {:?}", name);
+        debug!("Commands: {:?}", self.0.lock().unwrap().commands);
 
         if self.0.lock().unwrap().commands.contains_key(&name) {
             return Err(TclError::new(format!(
@@ -94,7 +100,7 @@ impl TclInterp {
 
         let res = unsafe {
             tcl_sys::Tcl_CreateCommand(
-                self.interp_ptr()?,
+                self.interp_ptr()?.as_ptr(),
                 name.as_ptr(),
                 Some(cmd_callback),
                 command_data,
@@ -120,8 +126,11 @@ impl TclInterp {
     pub fn deletecommand(&mut self, name: &str) -> Result<(), TclError> {
         let name =
             CString::new(name).map_err(|_| TclError::new("name must not contain NUL bytes."))?;
+        debug!("Trying to delete {:?}", name);
+        debug!("Commands: {:?}", self.0.lock().unwrap().commands);
+        debug!("Refcount: {:?}", std::rc::Rc::strong_count(&self.0),);
 
-        let res = unsafe { tcl_sys::Tcl_DeleteCommand(self.interp_ptr()?, name.as_ptr()) };
+        let res = unsafe { tcl_sys::Tcl_DeleteCommand(self.interp_ptr()?.as_ptr(), name.as_ptr()) };
 
         match res {
             0 => Ok(()),
@@ -184,8 +193,20 @@ mod tests {
             .createcommand("foo", Box::new("bar"), |_, _| Ok("hi".to_tcl_obj()))
             .unwrap();
 
+        assert!(interp
+            .0
+            .lock()
+            .unwrap()
+            .commands
+            .contains_key(&CString::new("foo").unwrap()));
         assert!(interp.eval("foo".to_owned()).is_ok());
         interp.deletecommand("foo").unwrap();
+        assert!(!interp
+            .0
+            .lock()
+            .unwrap()
+            .commands
+            .contains_key(&CString::new("foo").unwrap()));
         assert!(interp.eval("foo".to_owned()).is_err());
     }
 }

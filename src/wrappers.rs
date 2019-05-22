@@ -2,6 +2,7 @@ use std::os::raw::*;
 
 use crate::tclobj::{TclObj, ToTclObj};
 
+/// A wrapper around a list of Tcl objects.
 #[derive(Debug)]
 pub struct Objv(Vec<TclObj>, Vec<*mut tcl_sys::Tcl_Obj>);
 

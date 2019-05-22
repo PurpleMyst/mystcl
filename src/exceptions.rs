@@ -1,5 +1,8 @@
 use std::borrow::Cow;
 
+/// Represents an error returned from the Tcl interpreter.
+///
+/// This is usually just the error returned from Tcl itself.
 #[derive(Debug, Clone)]
 pub struct TclError(pub Cow<'static, str>);
 

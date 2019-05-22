@@ -11,6 +11,9 @@ mod tclobj;
 mod tkapp;
 mod wrappers;
 
+pub use tclinterp::TclInterp;
+pub use tclobj::{TclObj, ToTclObj};
+
 use tkapp::TkApp;
 
 fn errmsg(py: Python, err: &PyErr) -> String {
@@ -29,6 +32,7 @@ fn errmsg(py: Python, err: &PyErr) -> String {
     }
 }
 
+/// Create a new `TkApp` instance.
 #[pyfunction]
 fn create() -> PyResult<Py<TkApp>> {
     let gil = Python::acquire_gil();

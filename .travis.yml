@@ -12,7 +12,7 @@ rust:
 cache: cargo
 
 before_install:
-  - sudo apt install -y python3.6-dev tcl8.6-dev tk8.6-dev xvfb
+  - sudo apt install -y python3-dev tcl8.6-dev tk8.6-dev xvfb
   - cargo install pyo3-pack
 
 # TODO: Test with `teek` commit `f0acc49`.

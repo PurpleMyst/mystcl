@@ -89,15 +89,16 @@ mod tests {
     use super::*;
     use crate::errmsg;
 
-    macro_rules! pyerr_msg {
+    macro_rules! unwrap_pyerr {
         ($x:expr) => {
             $x.map_err(|e| errmsg(Python::acquire_gil().python(), &e))
+                .unwrap()
         };
     }
 
     #[test]
     fn test_new() {
-        pyerr_msg!(TkApp::new()).unwrap();
+        unwrap_pyerr!(TkApp::new());
     }
 
     macro_rules! pytuple {
@@ -111,10 +112,10 @@ mod tests {
         let gil = Python::acquire_gil();
         let py = gil.python();
 
-        let mut app = TkApp::new().expect("Could not create TkApp");
+        let mut app = unwrap_pyerr!(TkApp::new());
 
         assert_eq!(
-            pyerr_msg!(app.call(&pytuple!(py, ["return", "hello, world"]))).unwrap(),
+            unwrap_pyerr!(app.call(&pytuple!(py, ["return", "hello, world"]))),
             "hello, world"
         );
     }
@@ -124,8 +125,8 @@ mod tests {
         let gil = Python::acquire_gil();
         let py = gil.python();
 
-        let mut app = TkApp::new().expect("Could not create TkApp");
-        app.delete().expect("Could not delete interpeter");
+        let mut app = unwrap_pyerr!(TkApp::new());
+        unwrap_pyerr!(app.delete());
 
         if let Err(err) = app.call(&pytuple!(py, ["return", "test123"])) {
             assert_eq!(
@@ -140,10 +141,7 @@ mod tests {
     #[test]
     fn test_eval() {
         assert_eq!(
-            pyerr_msg!(pyerr_msg!(TkApp::new())
-                .unwrap()
-                .eval("return 42".to_owned()))
-            .unwrap(),
+            unwrap_pyerr!(unwrap_pyerr!(TkApp::new()).eval("return 42".to_owned())),
             "42"
         );
     }
@@ -153,15 +151,15 @@ mod tests {
         let gil = Python::acquire_gil();
         let py = gil.python();
 
-        let func = pyerr_msg!(py.eval("lambda *args: str(args)", None, None)).unwrap();
-        let func = pyerr_msg!(func.extract::<Py<PyAny>>()).unwrap();
+        let func = unwrap_pyerr!(py.eval("lambda *args: str(args)", None, None));
+        let func = unwrap_pyerr!(func.extract::<Py<PyAny>>());
 
-        let mut app = pyerr_msg!(TkApp::new()).unwrap();
+        let mut app = unwrap_pyerr!(TkApp::new());
 
-        pyerr_msg!(app.createcommand("foo", func)).unwrap();
+        unwrap_pyerr!(app.createcommand("foo", func));
 
         assert_eq!(
-            pyerr_msg!(app.call(&pytuple!(py, ["foo", "bar", "baz"]))).unwrap(),
+            unwrap_pyerr!(app.call(&pytuple!(py, ["foo", "bar", "baz"]))),
             "('bar', 'baz')"
         );
     }
@@ -171,17 +169,17 @@ mod tests {
         let gil = Python::acquire_gil();
         let py = gil.python();
 
-        let mut app = pyerr_msg!(TkApp::new()).unwrap();
+        let mut app = unwrap_pyerr!(TkApp::new());
 
-        let l1 = pyerr_msg!(app.call(pytuple!(py, ["list", "a", "b", "c and d"]))).unwrap();
+        let l1 = unwrap_pyerr!(app.call(pytuple!(py, ["list", "a", "b", "c and d"])));
 
         let l1_tuple_py = PyString::new(py, &l1);
         let l1_tuple = l1_tuple_py.as_ref(py);
 
-        let mut l1_parts = pyerr_msg!(app.splitlist(&l1_tuple)).unwrap();
+        let mut l1_parts = unwrap_pyerr!(app.splitlist(&l1_tuple));
         l1_parts.insert(0, "list".to_owned());
 
-        let l2 = pyerr_msg!(app.call(&PyTuple::new(py, l1_parts).as_ref(py))).unwrap();
+        let l2 = unwrap_pyerr!(app.call(&PyTuple::new(py, l1_parts).as_ref(py)));
 
         assert_eq!(l1, l2);
     }

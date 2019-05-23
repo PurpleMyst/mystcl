@@ -1,0 +1,23 @@
+---
+
+language: rust
+
+rust:
+  - stable
+  - beta
+  - nightly
+
+cache: cargo
+
+before_install:
+  - sudo apt install -y python3-dev tcl8.6-dev tk8.6-dev xvfb
+  - cargo install pyo3-pack
+
+# TODO: Test with `teek` commit `f0acc49`.
+script:
+  - ./test
+
+matrix:
+  allow_failures:
+    - rust: nightly
+  fast_finish: true

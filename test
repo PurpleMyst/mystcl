@@ -13,5 +13,5 @@ cd teek || exit 1
 git checkout f0acc49 || exit 1
 sed -i s/teek._ctypes_tcl/mystcl/g teek/_tcl_calls.py || exit 1
 ln -s "$lib_path" ./mystcl.so || exit 1
-python3 -m pip install --user pytest || exit 1
+python3 -m pip install --user pytest docutils || exit 1
 xvfb-run -a python3 -m pytest

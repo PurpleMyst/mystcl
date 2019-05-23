@@ -13,7 +13,7 @@ static LOGGER_INIT: Once = Once::new();
 
 impl TkApp {
     pub fn new() -> PyResult<Self> {
-        LOGGER_INIT.call_once(|| env_logger::init());
+        LOGGER_INIT.call_once(env_logger::init);
 
         let mut inst = Self {
             interp: TclInterp::new()?,

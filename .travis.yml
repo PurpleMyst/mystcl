@@ -19,9 +19,6 @@ addons:
       - tk8.6-dev
       - xvfb
 
-before_install:
-  - cargo install pyo3-pack
-
 # TODO: Test with `teek` commit `f0acc49`.
 script:
   - ./test

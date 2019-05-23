@@ -8,4 +8,4 @@
 Currently no way to use this properly.
 
 If you want to test this out though, run `cargo build` and you can import
-`mystcl` from the `mystcl.so` symlink present in the project directory.
+`mystcl` from the `mystcl.so` symlink present in the project directory

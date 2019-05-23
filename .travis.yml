@@ -21,6 +21,5 @@ addons:
       - xvfb
     update: true
 
-# TODO: Test with `teek` commit `f0acc49`.
 script:
   - ./test

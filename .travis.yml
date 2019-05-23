@@ -4,10 +4,7 @@ dist: xenial  # required for python
 
 language: rust
 
-rust:
-  - stable
-  - beta
-  - nightly
+rust: nightly
 
 cache: cargo
 
@@ -22,8 +19,3 @@ addons:
 # TODO: Test with `teek` commit `f0acc49`.
 script:
   - ./test
-
-matrix:
-  allow_failures:
-    - rust: nightly
-  fast_finish: true

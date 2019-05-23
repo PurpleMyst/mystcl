@@ -4,7 +4,6 @@ dist: xenial  # required for python
 
 env:
   RUST_BACKTRACE: 1
-  RUST_LOG: debug
 
 language: rust
 

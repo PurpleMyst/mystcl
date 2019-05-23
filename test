@@ -2,4 +2,4 @@
 
 # --no-default-features -> https://pyo3.rs/v0.7.0-alpha.1/advanced.html#testing
 # --test-threads=1 -> more than one test thread seems to deadlock the GIL
-cargo test --no-default-features -- --test-threads=1 --nocapture "$@"
+xvfb-run -a cargo test --no-default-features -- --test-threads=1 --nocapture "$@"

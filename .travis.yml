@@ -1,5 +1,7 @@
 ---
 
+dist: xenial  # required for python
+
 language: rust
 
 rust:

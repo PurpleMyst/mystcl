@@ -2,6 +2,9 @@
 
 dist: xenial  # required for python
 
+env:
+  RUST_BACKTRACE: 1
+
 language: rust
 
 rust: nightly

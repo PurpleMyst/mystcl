@@ -19,6 +19,7 @@ addons:
       - tcl8.6-dev
       - tk8.6-dev
       - xvfb
+    update: true
 
 # TODO: Test with `teek` commit `f0acc49`.
 script:

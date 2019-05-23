@@ -115,7 +115,7 @@ mod tests {
         let mut app = unwrap_pyerr!(TkApp::new());
 
         assert_eq!(
-            unwrap_pyerr!(app.call(&pytuple!(py, ["return", "hello, world"]))),
+            unwrap_pyerr!(app.call(&pytuple!(py, ["format", "%s", "hello, world"]))),
             "hello, world"
         );
     }
@@ -128,7 +128,7 @@ mod tests {
         let mut app = unwrap_pyerr!(TkApp::new());
         unwrap_pyerr!(app.delete());
 
-        if let Err(err) = app.call(&pytuple!(py, ["return", "test123"])) {
+        if let Err(err) = app.call(&pytuple!(py, ["format", "%s", "test123"])) {
             assert_eq!(
                 crate::errmsg(py, &err),
                 "Tried to use interpreter after deletion"
@@ -141,7 +141,7 @@ mod tests {
     #[test]
     fn test_eval() {
         assert_eq!(
-            unwrap_pyerr!(unwrap_pyerr!(TkApp::new()).eval("return 42".to_owned())),
+            unwrap_pyerr!(unwrap_pyerr!(TkApp::new()).eval("format %s {42}".to_owned())),
             "42"
         );
     }

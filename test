@@ -12,5 +12,5 @@ for PYBIN in /opt/python/{cp35-cp35m,cp36-cp36m,cp37-cp37m}/bin; do
         docutils sphinx \
         pillow reportlab svglib lxml beautifulsoup4 || exit 1
 
-    ( pushd teek && "${PYBIN/python}" -m pytest && popd ) || exit 1
+    ( pushd teek && "${PYBIN}/python" -m pytest && popd ) || exit 1
 done

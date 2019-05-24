@@ -2,9 +2,13 @@
 
 git clone --no-checkout https://github.com/Akuli/teek || exit 1
 git -C teek checkout f0acc49 || exit 1
-sed -i s/teek._ctypes_tcl/mystcl/g teek/teek/_tcl_calls.py || exit 1
+sed -i 's/teek._ctypes_tcl/mystcl/g' teek/teek/_tcl_calls.py || exit 1
+sed -i '/^import _tkinter$/d' teek/teek/_platform_info.py || exit 1
+sed -Ei $'s/^(TCL_VERSION|TK_VERSION) = .*?$/\\1 = (8, 6)/g' teek/teek/_platform_info.py || exit 1
 
 for PYBIN in /opt/python/{cp35-cp35m,cp36-cp36m,cp37-cp37m}/bin; do
+    test -d "$PYBIN" || exit 1
+
     export PYTHON_SYS_EXECUTABLE="$PYBIN/python"
 
     "${PYBIN}/pip" install \

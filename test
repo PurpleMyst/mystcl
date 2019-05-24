@@ -1,19 +1,16 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
-# --no-default-features -> https://pyo3.rs/v0.7.0-alpha.1/advanced.html#testing
-# --test-threads=1 -> more than one test thread seems to deadlock the GIL
-xvfb-run -a cargo test --no-default-features -- --test-threads=1 --nocapture "$@" || exit 1
+git clone --no-checkout https://github.com/Akuli/teek || exit 1
+git -C teek checkout f0acc49 || exit 1
+sed -i s/teek._ctypes_tcl/mystcl/g teek/teek/_tcl_calls.py || exit 1
 
-cargo build --release || exit 1
-lib_path=$(pwd)/target/release/libmystcl.so
+for PYBIN in /opt/python/{cp35-cp35m,cp36-cp36m,cp37-cp37m}/bin; do
+    export PYTHON_SYS_EXECUTABLE="$PYBIN/python"
 
-cd "$(mktemp -d)" || exit 1
-git clone https://github.com/Akuli/teek || exit 1
-cd teek || exit 1
-git checkout f0acc49 || exit 1
-sed -i s/teek._ctypes_tcl/mystcl/g teek/_tcl_calls.py || exit 1
-ln -s "$lib_path" ./mystcl.so || exit 1
-python3 -m pip install --user \
-    pytest docutils sphinx pillow reportlab svglib lxml beautifulsoup4 lxml || exit 1
+    "${PYBIN}/pip" pip install \
+        pytest \
+        docutils sphinx \
+        pillow reportlab svglib lxml beautifulsoup4 || exit 1
 
-xvfb-run -a python3 -m pytest
+    ( pushd teek && "${PYBIN/python}" -m pytest && popd ) || exit 1
+done

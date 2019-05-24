@@ -1,6 +1,0 @@
-#!/usr/bin/env sh
-
-pyo3-pack publish \
-    --username PurpleMyst \
-    --interpreter python3 \
-    --manylinux off

@@ -7,7 +7,7 @@ sed -i s/teek._ctypes_tcl/mystcl/g teek/teek/_tcl_calls.py || exit 1
 for PYBIN in /opt/python/{cp35-cp35m,cp36-cp36m,cp37-cp37m}/bin; do
     export PYTHON_SYS_EXECUTABLE="$PYBIN/python"
 
-    "${PYBIN}/pip" pip install \
+    "${PYBIN}/pip" install \
         pytest \
         docutils sphinx \
         pillow reportlab svglib lxml beautifulsoup4 || exit 1

@@ -1,6 +1,6 @@
 [package]
 name = "mystcl"
-version = "1.0.1"
+version = "1.0.2"
 authors = ["Purple Myst <PurpleMyst@users.noreply.github.com>"]
 edition = "2018"
 

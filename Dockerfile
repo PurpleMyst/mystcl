@@ -16,7 +16,7 @@ RUN ./configure
 RUN make -j2
 RUN make install
 
-RUN curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
+RUN curl https://sh.rustup.rs -f | sh -s -- --default-toolchain nightly -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 CMD /app/build_wheels

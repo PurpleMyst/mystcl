@@ -6,14 +6,14 @@ RUN git clone https://github.com/tcltk/tcl /tcl
 WORKDIR /tcl/unix
 RUN git checkout core-8-6-9
 RUN ./configure
-RUN make
+RUN make -j2
 RUN make install
 
 RUN git clone https://github.com/tcltk/tk /tk
 WORKDIR /tk/unix
 RUN git checkout core-8-6-9
 RUN ./configure
-RUN make
+RUN make -j2
 RUN make install
 
 RUN curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y

@@ -10,3 +10,9 @@ before_install:
 
 script:
   - docker run mystcl ./test
+
+deploy:
+  provider: script
+  script: docker run mystcl ./deploy
+  on:
+    tags: true

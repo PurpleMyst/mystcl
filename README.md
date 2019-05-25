@@ -1,11 +1,29 @@
-# mystcl
+mystcl
+======
 
-`mystcl` is a simple Python Tcl/Tk interface meant for Akuli's
-[teek](https://github.com/Akuli/teek)
+`mystcl` is a basic Tcl/Tk interface for Python.
 
-## Usage
+Its existance is meant as a tkinter replacement for [teek](https://github.com/Akuli/teek).
 
-Currently no way to use this properly.
+Dependencies
+------------
 
-If you want to test this out though, run `cargo build` and you can import
-`mystcl` from the `mystcl.so` symlink present in the project directory
+Installing `mystcl` via PyPI has no dependencies, as the `Dockerfile`
+includes the required dependenceis in the wheel itself.
+
+Installation
+------------
+
+Every `master` tag is uploaded to PyPI automatically via Travis, so you can
+install `mystcl` simply by running:
+
+```sh
+$ python3 -m pip install --user --upgrade mystcl
+```
+
+Compilation
+-----------
+
+Compilation has dependencies on `rust` nightly,  tcl8.6 and tk8.6. You can
+compile just via `cargo buidl --release`. You'll get a `libmystcl.so` in
+`target/release/` which you can rename to `mystcl.so` and use.

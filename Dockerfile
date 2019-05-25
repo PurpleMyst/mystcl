@@ -1,6 +1,6 @@
 FROM quay.io/pypa/manylinux2010_x86_64
 
-RUN yum install -y clang xorg-x11-server-Xvfb
+RUN yum install -y clang xorg-x11-server-Xvfb xorg-x11-fonts-*
 
 RUN git clone https://github.com/tcltk/tcl /tcl
 WORKDIR /tcl/unix

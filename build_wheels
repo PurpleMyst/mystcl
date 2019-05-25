@@ -4,9 +4,15 @@ for PYBIN in /opt/python/{cp35-cp35m,cp36-cp36m,cp37-cp37m}/bin; do
     export PYTHON_SYS_EXECUTABLE="$PYBIN/python"
 
    "${PYBIN}/pip" install -U setuptools setuptools-rust || exit 1
-   "${PYBIN}/python" setup.py bdist_wheel develop || exit 1
+   "${PYBIN}/python" setup.py bdist_wheel || exit 1
 done
 
 for whl in dist/*.whl; do
     auditwheel repair "$whl" -w dist/ || exit 1
+done
+
+for PYBIN in /opt/python/{cp35-cp35m,cp36-cp36m,cp37-cp37m}/bin; do
+    export PYTHON_SYS_EXECUTABLE="$PYBIN/python"
+
+   "${PYBIN}/python" setup.py install || exit 1
 done

@@ -14,5 +14,6 @@ script:
 deploy:
   provider: script
   script: docker run mystcl ./deploy
+  skip_cleanup: true
   on:
     tags: true

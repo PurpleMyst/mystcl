@@ -19,9 +19,4 @@ RUN make install
 RUN curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-WORKDIR /app
-COPY . .
-
-RUN ./build_wheels
-
-RUN /opt/python/cp37-cp37m/bin/python -m pip install twine
+CMD /app/build_wheels

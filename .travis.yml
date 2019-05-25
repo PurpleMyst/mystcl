@@ -1,6 +1,6 @@
 ---
 
-language: minimal
+language: python
 
 services:
   - docker
@@ -9,7 +9,7 @@ before_install:
   - docker build -t mystcl .
 
 script:
-  - docker run mystcl ./test
+  - docker run -v $TRAVIS_BUILD_DIR:/app mystcl
 
 deploy:
   provider: script

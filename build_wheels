@@ -1,18 +1,52 @@
 #!/usr/bin/env bash
 
+set -ex
+
+dir=$(dirname "$0")
+test -n "$dir"
+cd "$dir"
+
+if [[ -d dist ]]; then
+    rm -rf dist
+fi
+
+cleanup() {
+    rm -rf "$dir"/{teek,target,build,mystcl.egg-info}
+}
+trap cleanup EXIT
+
 for PYBIN in /opt/python/{cp35-cp35m,cp36-cp36m,cp37-cp37m}/bin; do
+    if [[ ! -d $PYBIN ]]; then
+        echo "This must be run inside the manylinux Docker container."
+        exit 1
+    fi
+
     export PYTHON_SYS_EXECUTABLE="$PYBIN/python"
 
-   "${PYBIN}/pip" install -U setuptools setuptools-rust || exit 1
-   "${PYBIN}/python" setup.py bdist_wheel || exit 1
+   "$PYTHON_SYS_EXECUTABLE" -m pip install --upgrade setuptools setuptools-rust
+   "$PYTHON_SYS_EXECUTABLE" setup.py bdist_wheel
 done
 
 for whl in dist/*.whl; do
-    auditwheel repair "$whl" -w dist/ || exit 1
+    auditwheel repair "$whl" -w dist/
 done
+
+git clone --no-checkout https://github.com/Akuli/teek
+
+git -C teek checkout f0acc49
+git -C teek apply ../teek.patch
 
 for PYBIN in /opt/python/{cp35-cp35m,cp36-cp36m,cp37-cp37m}/bin; do
     export PYTHON_SYS_EXECUTABLE="$PYBIN/python"
 
-   "${PYBIN}/python" setup.py install || exit 1
+   "$PYTHON_SYS_EXECUTABLE" setup.py install
+
+   pushd teek
+   "$PYTHON_SYS_EXECUTABLE" -m pip install \
+        pytest \
+        docutils sphinx \
+        pillow reportlab svglib lxml beautifulsoup4
+
+   CI=yes xvfb-run "$PYTHON_SYS_EXECUTABLE" -m pytest
+   popd
 done

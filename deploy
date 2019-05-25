@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 
+set -ex
+
 if [[ -z $TWINE_USERNAME || -z $TWINE_PASSWORD ]]; then
     echo "No username or password set for twine."
     exit 1
 fi
 
-twine upload dist/*
+python3 -m pip install --upgrade twine
+python3 -m twine upload dist/*

@@ -13,7 +13,7 @@ script:
 
 deploy:
   provider: script
-  script: docker run mystcl ./deploy
+  script: docker run -e TWINE_USERNAME -e TWINE_PASSWORD mystcl ./deploy
   skip_cleanup: true
   on:
     tags: true

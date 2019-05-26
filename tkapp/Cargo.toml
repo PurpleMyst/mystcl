@@ -1,0 +1,14 @@
+[package]
+name = "tkapp"
+version = "1.0.0"
+authors = ["Purple Myst <PurpleMyst@users.noreply.github.com>"]
+edition = "2018"
+
+[lib]
+name = "mystcl"
+crate-type = ["cdylib"]
+
+[dependencies]
+tclinterp = { path = "../tclinterp" }
+pyo3 = "0.7.0-alpha.1"
+env_logger = "0.6.1"

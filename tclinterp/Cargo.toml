@@ -1,0 +1,11 @@
+[package]
+name = "tclinterp"
+version = "1.0.7"
+authors = ["Purple Myst <PurpleMyst@users.noreply.github.com>"]
+edition = "2018"
+
+[dependencies]
+tcl-sys = { path = "../tcl-sys" }
+rand = "0.6.5"
+log = "0.4.6"
+pyo3 = "0.7.0-alpha.1"

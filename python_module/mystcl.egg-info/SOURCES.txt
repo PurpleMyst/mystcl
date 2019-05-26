@@ -1,0 +1,7 @@
+setup.py
+mystcl/__init__.py
+mystcl.egg-info/PKG-INFO
+mystcl.egg-info/SOURCES.txt
+mystcl.egg-info/dependency_links.txt
+mystcl.egg-info/not-zip-safe
+mystcl.egg-info/top_level.txt

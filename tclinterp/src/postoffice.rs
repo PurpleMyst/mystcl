@@ -34,6 +34,7 @@ pub trait PostOffice: Read + Write {
         self.write_all(&[msg.cmd as u8])?;
         self.write_all(&msg.data.len().to_be_bytes())?;
         self.write_all(&msg.data)?;
+        self.flush()?;
 
         Ok(())
     }

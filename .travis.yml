@@ -13,7 +13,7 @@ script:
 
 deploy:
   provider: script
-  script: ./deploy
+  script: scripts/deploy
   skip_cleanup: true
   on:
     tags: true

@@ -26,6 +26,23 @@ pub trait ToTclObj {
     fn to_tcl_obj(self) -> TclObj;
 }
 
+impl ToTclObj for TclObj {
+    fn to_tcl_obj(self) -> TclObj {
+        self
+    }
+}
+
+// XXX: This feels like a weird instance.
+// It's basically meant for &&str
+impl<T> ToTclObj for &T
+where
+    T: Copy + ToTclObj,
+{
+    fn to_tcl_obj(self) -> TclObj {
+        self.clone().to_tcl_obj()
+    }
+}
+
 impl ToTclObj for &[u8] {
     fn to_tcl_obj(self) -> TclObj {
         // `Tcl_NewStringObj` copies its argument.

@@ -1,5 +1,4 @@
 use std::{
-    io::{Read, Write},
     net::{TcpListener, TcpStream},
     thread,
 };
@@ -29,7 +28,7 @@ fn create_channel(interp: TclInterp) -> Result<(TcpStream, TclSocket), TclError>
 
 #[cfg(test)]
 mod tests {
-    use std::io::{BufRead, BufReader};
+    use std::io::{BufRead, BufReader, Read, Write};
 
     use super::*;
 

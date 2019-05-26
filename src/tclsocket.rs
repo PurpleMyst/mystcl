@@ -11,6 +11,12 @@ pub struct TclSocket {
     id: String,
 }
 
+impl Drop for TclSocket {
+    fn drop(&mut self) {
+        self.interp.call(&["close", &self.id]).unwrap();
+    }
+}
+
 impl TclSocket {
     /// Connect to a specified host:port.
     pub fn connect(mut interp: TclInterp, host: &str, port: &str) -> Result<Self, TclError> {

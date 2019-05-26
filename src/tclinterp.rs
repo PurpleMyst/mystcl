@@ -30,6 +30,8 @@ use createcommand::CommandData;
 mod preserve;
 use preserve::Preserve;
 
+mod channel;
+
 struct TclInterpData {
     interp: NonNull<tcl_sys::Tcl_Interp>,
     commands: HashMap<CString, *mut CommandData>,

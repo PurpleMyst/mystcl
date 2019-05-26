@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, error, fmt};
 
 /// Represents an error returned from the Tcl interpreter.
 ///
@@ -11,6 +11,14 @@ impl TclError {
         Self(s.into())
     }
 }
+
+impl fmt::Display for TclError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl error::Error for TclError {}
 
 pub(super) mod py {
     use pyo3::create_exception;

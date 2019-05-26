@@ -3,8 +3,8 @@
 set -ex
 
 dir=$(dirname "$0")
-test -n "$dir/.."
-cd "$dir/.."
+test -n "$dir/../python_module"
+cd "$dir/../python_module"
 
 if [[ -z $TWINE_USERNAME || -z $TWINE_PASSWORD ]]; then
     echo "No username or password set for twine."

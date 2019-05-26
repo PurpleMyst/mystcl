@@ -27,13 +27,13 @@ impl From<TclError> for std::io::Error {
 }
 
 pub(super) mod py {
-    use pyo3::create_exception;
+    use pyo3::{create_exception, PyErr};
 
     create_exception!(mystcl, TclError, pyo3::exceptions::Exception);
-}
 
-impl From<TclError> for pyo3::PyErr {
-    fn from(err: TclError) -> Self {
-        py::TclError::py_err(err.0)
+    impl From<super::TclError> for PyErr {
+        fn from(err: super::TclError) -> Self {
+            TclError::py_err(err.0)
+        }
     }
 }

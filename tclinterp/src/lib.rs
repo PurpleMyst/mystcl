@@ -4,6 +4,7 @@
 // FIXME: Use a custom-built type instead of `CStr` to handle strings containing NUL bytes.
 
 mod exceptions;
+mod postoffice;
 mod tclinterp;
 mod tclobj;
 mod tclsocket;

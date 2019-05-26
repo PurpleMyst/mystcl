@@ -5,12 +5,14 @@ use std::{
 
 use crate::{exceptions::TclError, tclinterp::TclInterp};
 
+/// A wrapper around a Tcl socket that allows Read/Write trait usage.
 pub struct TclSocket {
     interp: TclInterp,
     id: String,
 }
 
 impl TclSocket {
+    /// Connect to a specified host:port.
     pub fn connect(mut interp: TclInterp, host: &str, port: &str) -> Result<Self, TclError> {
         let id = interp.call(&["socket", host, &port.to_string()])?;
         let mut inst = Self { interp, id };

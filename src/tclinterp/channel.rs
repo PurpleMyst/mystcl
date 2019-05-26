@@ -9,7 +9,8 @@ use crate::tclsocket::TclSocket;
 
 use super::*;
 
-fn create_channel(interp: TclInterp) -> Result<(TcpStream, TclSocket), TclError> {
+/// Create a two-way communication channel between Rust and Tcl.
+pub fn create_channel(interp: TclInterp) -> Result<(TcpStream, TclSocket), TclError> {
     let host = "127.0.0.1";
     let port = rand::thread_rng().gen_range(1024, 8096);
 

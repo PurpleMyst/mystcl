@@ -8,6 +8,7 @@ use pyo3::{prelude::*, wrap_pyfunction};
 mod exceptions;
 mod tclinterp;
 mod tclobj;
+mod tclsocket;
 mod tkapp;
 mod wrappers;
 

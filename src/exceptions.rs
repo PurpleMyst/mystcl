@@ -20,6 +20,12 @@ impl fmt::Display for TclError {
 
 impl error::Error for TclError {}
 
+impl From<TclError> for std::io::Error {
+    fn from(err: TclError) -> std::io::Error {
+        std::io::Error::new(std::io::ErrorKind::Other, err)
+    }
+}
+
 pub(super) mod py {
     use pyo3::create_exception;
 

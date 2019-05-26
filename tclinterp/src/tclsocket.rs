@@ -32,6 +32,10 @@ impl TclSocket {
             .call(&["fconfigure", &self.id, &format!("-{}", key), value])
             .map(|_| ())
     }
+
+    pub fn id(&self) -> String {
+        self.id.clone()
+    }
 }
 
 impl Read for TclSocket {

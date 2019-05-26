@@ -19,6 +19,14 @@ impl TclObj {
     pub fn as_ptr(&self) -> *mut tcl_sys::Tcl_Obj {
         self.ptr.as_ptr()
     }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        let mut length: i32 = Default::default();
+
+        let data: *mut u8 = unsafe { tcl_sys::Tcl_GetByteArrayFromObj(self.as_ptr(), &mut length) };
+
+        unsafe { std::slice::from_raw_parts(data as *const _, length as usize) }
+    }
 }
 
 // Is `IntoTclObj` a better name for this?

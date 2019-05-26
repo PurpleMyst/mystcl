@@ -41,12 +41,12 @@ mod tests {
     #[test]
     fn test_tclsock_recv_data() {
         let (mut rust, mut tcl) = create_channel(TclInterp::new().unwrap()).unwrap();
-        write!(rust, "hello, world").unwrap();
+        write!(rust, "\0hello, \0world\0").unwrap();
 
         let mut data: String = Default::default();
         tcl.read_to_string(&mut data).unwrap();
 
-        assert_eq!(data, "hello, world");
+        assert_eq!(data, "\0hello, \0world\0");
     }
 
     #[test]
@@ -62,12 +62,12 @@ mod tests {
     #[test]
     fn test_tclsock_send() {
         let (rust, mut tcl) = create_channel(TclInterp::new().unwrap()).unwrap();
-        write!(tcl, "hello, world\n").unwrap();
+        write!(tcl, "\0hello, \0world\0\n").unwrap();
         tcl.flush().unwrap();
 
         let mut data: String = Default::default();
         BufReader::new(rust).read_line(&mut data).unwrap();
 
-        assert_eq!(data, "hello, world\n");
+        assert_eq!(data, "\0hello, \0world\0\n");
     }
 }

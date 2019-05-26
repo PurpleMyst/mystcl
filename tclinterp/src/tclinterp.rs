@@ -112,7 +112,7 @@ impl TclInterp {
     /// # Errors
     /// This function fails if `code` contains NUL bytes or if there is an error evaluating the Tcl
     /// code.
-    pub fn eval(&mut self, code: String) -> Result<String, TclError> {
+    pub fn eval(&mut self, code: String) -> Result<TclObj, TclError> {
         trace!("Evaluating code {:?}", code);
 
         let c_code =
@@ -122,8 +122,7 @@ impl TclInterp {
             tcl_sys::Tcl_Eval(self.interp_ptr()?.as_ptr(), c_code.as_ptr())
         })?;
 
-        let result = self.get_result()?;
-        Ok(result.to_string())
+        self.get_result()
     }
 
     /// Evaluate a piece of Tcl code given as a list.
@@ -131,7 +130,7 @@ impl TclInterp {
     /// # Errors
     /// This function fails if any of the given arguments are not convertable to Tcl objects or if
     /// there is an error evaluating the resulting Tcl code.
-    pub fn call<I>(&mut self, it: I) -> Result<String, TclError>
+    pub fn call<I>(&mut self, it: I) -> Result<TclObj, TclError>
     where
         I: IntoIterator,
         I::Item: ToTclObj,
@@ -143,8 +142,7 @@ impl TclInterp {
             tcl_sys::Tcl_EvalObjv(self.interp_ptr()?.as_ptr(), objv.len(), objv.as_ptr(), 0)
         })?;
 
-        let result = self.get_result()?;
-        Ok(result.to_string())
+        self.get_result()
     }
 
     fn get_result(&self) -> Result<TclObj, TclError> {

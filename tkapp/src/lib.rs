@@ -31,12 +31,14 @@ impl TkApp {
     fn call(&mut self, args: &PyTuple) -> PyResult<String> {
         self.interp
             .call(args)
+            .map(|obj| obj.to_string())
             .map_err(|err| TclError::py_err(err.0))
     }
 
     fn eval(&mut self, code: String) -> PyResult<String> {
         self.interp
             .eval(code)
+            .map(|obj| obj.to_string())
             .map_err(|err| TclError::py_err(err.0))
     }
 

@@ -20,7 +20,9 @@ impl Drop for TclSocket {
 impl TclSocket {
     /// Connect to a specified host:port.
     pub fn connect(mut interp: TclInterp, host: &str, port: &str) -> Result<Self, TclError> {
-        let id = interp.call(&["socket", host, &port.to_string()])?;
+        let id = interp
+            .call(&["socket", host, &port.to_string()])?
+            .to_string();
         let mut inst = Self { interp, id };
         inst.fconfigure("blocking", "false")?;
         inst.fconfigure("translation", "binary")?;
@@ -43,12 +45,12 @@ impl Read for TclSocket {
         let data = self
             .interp
             .call(&["read", &self.id, &buf.len().to_string()])?;
+
         let data_bytes = data.as_bytes();
 
-        // Can we do this safely?
         unsafe { ptr::copy_nonoverlapping(data_bytes.as_ptr(), buf.as_mut_ptr(), data_bytes.len()) }
 
-        Ok(data.len())
+        Ok(data_bytes.len())
     }
 }
 

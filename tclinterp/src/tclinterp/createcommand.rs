@@ -149,7 +149,7 @@ mod tests {
                     .ok_or_else(|| unreachable!())
             })
             .unwrap();
-        assert_eq!(interp.eval("foo".to_string()).unwrap(), "bar");
+        assert_eq!(interp.eval("foo".to_string()).unwrap().to_string(), "bar");
     }
 
     #[test]
@@ -169,7 +169,8 @@ mod tests {
         assert_eq!(
             interp
                 .eval("ham spam ham spam spam ham ham spam".to_string())
-                .unwrap(),
+                .unwrap()
+                .to_string(),
             "spam ham spam spam ham ham spam"
         );
     }

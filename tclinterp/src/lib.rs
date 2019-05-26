@@ -29,7 +29,8 @@ mod tests {
             TclInterp::new()
                 .unwrap()
                 .call(&["format", "%s", "hello, world"])
-                .unwrap(),
+                .unwrap()
+                .to_string(),
             "hello, world"
         );
     }
@@ -51,7 +52,8 @@ mod tests {
             TclInterp::new()
                 .unwrap()
                 .eval("format %s {42}".to_owned())
-                .unwrap(),
+                .unwrap()
+                .to_string(),
             "42"
         );
     }
@@ -60,13 +62,16 @@ mod tests {
     fn test_splitlist() {
         let mut interp = TclInterp::new().unwrap();
 
-        let l1 = interp.call(&["list", "a", "b", "c and d"]).unwrap();
+        let l1 = interp
+            .call(&["list", "a", "b", "c and d"])
+            .unwrap()
+            .to_string();
 
         let mut l1_parts = interp.splitlist(&l1 as &str).unwrap();
         l1_parts.insert(0, "list".to_owned());
 
         let l2 = interp.call(l1_parts.iter().map(|s| s as &str)).unwrap();
 
-        assert_eq!(l1, l2);
+        assert_eq!(l1.to_string(), l2.to_string());
     }
 }

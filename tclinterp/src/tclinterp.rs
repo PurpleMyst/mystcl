@@ -1,26 +1,31 @@
 use std::{
+    cell::RefCell,
     collections::HashMap,
     ffi::{CStr, CString},
-    mem,
+    io, mem,
+    net::TcpStream,
     os::raw::*,
     ptr::{self, NonNull},
-    rc::Rc,
     slice,
+    sync::Arc,
     sync::Mutex,
+    thread,
 };
 
 use log::{debug, trace};
 
 use crate::{
     exceptions::TclError,
+    postoffice::{Letter, LetterCommand, PostOffice},
     tclobj::{TclObj, ToTclObj},
+    tclsocket::TclSocket,
     wrappers::Objv,
 };
 
-/// Access a TclInterpData attribute through the Rc<Mutex<_>>.
+/// Access a TclInterpData attribute through the Arc<Mutex<_>>.
 macro_rules! attr {
     ($self:ident.$name:ident) => {
-        $self.0.lock().unwrap().$name
+        $self.0.try_lock().unwrap().$name
     };
 }
 
@@ -36,7 +41,13 @@ struct TclInterpData {
     interp: NonNull<tcl_sys::Tcl_Interp>,
     commands: HashMap<CString, *mut CommandData>,
     exit_var_name: String,
+
+    owner: thread::ThreadId,
+    safety_sock: Option<TcpStream>,
 }
+
+unsafe impl Send for TclInterpData {}
+unsafe impl Sync for TclInterpData {}
 
 /// A wrapper type around a `*Tcl_Interp`.
 ///
@@ -46,7 +57,7 @@ struct TclInterpData {
 /// Any of the methods of this struct that return a `Result` have the possibility to return an
 /// `Err` if the `*Tcl_Interp` is used post-deletion.
 #[derive(Clone)]
-pub struct TclInterp(Rc<Mutex<TclInterpData>>);
+pub struct TclInterp(Arc<Mutex<TclInterpData>>);
 
 impl TclInterp {
     /// Create a new Tcl interpreter.
@@ -62,12 +73,15 @@ impl TclInterp {
             let exit_var_name = format!("exit_var_{}", rand::random::<u64>());
             debug!("Creating exit variable {:?}", exit_var_name);
 
-            let interp = Rc::new(Mutex::new(TclInterpData {
+            let interp = Arc::new(Mutex::new(TclInterpData {
                 interp: NonNull::new(tcl_sys::Tcl_CreateInterp())
                     .ok_or_else(|| TclError::new("Tcl_CreateInterp() returned NULL"))?,
 
                 commands: Default::default(),
                 exit_var_name: exit_var_name.clone(),
+
+                owner: thread::current().id(),
+                safety_sock: Default::default(),
             }));
 
             let mut inst = Self(interp);
@@ -94,12 +108,63 @@ impl TclInterp {
         Ok(())
     }
 
+    pub fn init_threads(&mut self) -> Result<(), TclError> {
+        let (rsock, tclsock) = channel::create_channel(self.clone())?;
+        let tclsock_id = tclsock.id();
+
+        let cmd_name = format!("thread_handler{}", rand::random::<u64>());
+        self.createcommand(&cmd_name, Box::new(RefCell::new(tclsock)), |cmd_data, _| {
+            let mut sock = cmd_data
+                .data
+                .downcast_ref::<RefCell<TclSocket>>()
+                .unwrap()
+                .borrow_mut();
+
+            let msg = match sock.recv_msg() {
+                Ok(msg) => msg,
+                Err(ref err) => {
+                    return if err.kind() == io::ErrorKind::UnexpectedEof {
+                        // it's normal that a `readable` fileevent gets called on EOF.
+                        Ok("".to_tcl_obj())
+                    } else {
+                        Err(err.to_string().to_tcl_obj())
+                    };
+                }
+            };
+
+            let resp_data: Result<Vec<u8>, TclError> = match msg.cmd() {
+                LetterCommand::Eval => cmd_data
+                    .interp
+                    .clone() // TODO: remove this clone later
+                    // FIXME: make TclInterp::Eval take a ToTclObj
+                    .eval(std::str::from_utf8(msg.data()).unwrap().to_owned())
+                    .map(|obj| obj.to_string().into()),
+            };
+
+            match resp_data {
+                Ok(resp_data) => {
+                    sock.send_msg(Letter::new(msg.cmd(), resp_data)).unwrap();
+                    Ok("".to_tcl_obj())
+                }
+
+                Err(err) => Err(err.to_string().to_tcl_obj()),
+            }
+        })?;
+        self.call(&["fileevent", &tclsock_id, "readable", &cmd_name])?;
+
+        attr!(self.safety_sock) = Some(rsock);
+
+        Ok(())
+    }
+
     pub fn deleted(&self) -> bool {
         let ptr = attr!(self.interp).as_ptr();
         (unsafe { tcl_sys::Tcl_InterpDeleted(ptr) }) != 0
     }
 
     fn interp_ptr(&self) -> Result<Preserve<tcl_sys::Tcl_Interp>, TclError> {
+        debug_assert_eq!(thread::current().id(), attr!(self.owner));
+
         if self.deleted() {
             return Err(TclError::new("Tried to use interpreter after deletion"));
         }
@@ -118,11 +183,22 @@ impl TclInterp {
         let c_code =
             CString::new(code).map_err(|_| TclError::new("code must not contain NUL bytes."))?;
 
-        self.check_statuscode(unsafe {
-            tcl_sys::Tcl_Eval(self.interp_ptr()?.as_ptr(), c_code.as_ptr())
-        })?;
+        if thread::current().id() == attr!(self.owner) {
+            self.check_statuscode(unsafe {
+                tcl_sys::Tcl_Eval(self.interp_ptr()?.as_ptr(), c_code.as_ptr())
+            })?;
 
-        self.get_result()
+            self.get_result()
+        } else {
+            let mut safety_sock = attr!(self.safety_sock).take().unwrap();
+            safety_sock
+                .send_msg(Letter::new(LetterCommand::Eval, c_code))
+                .unwrap();
+
+            let response = safety_sock.recv_msg().unwrap();
+
+            Ok(response.data().to_tcl_obj())
+        }
     }
 
     /// Evaluate a piece of Tcl code given as a list.
@@ -261,5 +337,40 @@ impl Drop for TclInterpData {
                 .map(|ptr| Box::from_raw(ptr))
                 .for_each(mem::drop);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_init_threads() {
+        let mut interp = TclInterp::new().unwrap();
+        interp.init_threads().unwrap();
+
+        let mut barrier = Arc::new(std::sync::Barrier::new(2));
+
+        let child1 = {
+            let mut interp = interp.clone();
+            let mut barrier = barrier.clone();
+
+            std::thread::spawn(move || {
+                barrier.wait();
+                interp
+                    .eval("format %s 42".to_owned())
+                    .map(|obj| obj.to_string())
+            })
+        };
+
+        barrier.wait();
+        let fuckyou = attr!(interp.exit_var_name).clone();
+        interp
+            .call(&["after", "100", "set", &fuckyou, "true"])
+            .unwrap();
+        interp.mainloop().unwrap();
+
+        let res = child1.join().unwrap().unwrap();
+        assert_eq!(res.to_string(), "42");
     }
 }

@@ -54,22 +54,25 @@ where
 impl ToTclObj for &[u8] {
     fn to_tcl_obj(self) -> TclObj {
         // `Tcl_NewStringObj` copies its argument.
+        let ptr = unsafe { tcl_sys::Tcl_NewByteArrayObj(self.as_ptr(), self.len() as c_int) };
+        TclObj::new(NonNull::new(ptr).unwrap())
+    }
+}
+
+// FIXME: https://www.tcl.tk/man/tcl8.6/TclLib/Encoding.htm
+impl ToTclObj for &str {
+    fn to_tcl_obj(self) -> TclObj {
+        let baites = self.as_bytes();
         let ptr = unsafe {
-            tcl_sys::Tcl_NewStringObj(self.as_ptr() as *const c_char, self.len() as c_int)
+            tcl_sys::Tcl_NewStringObj(baites.as_ptr() as *const c_char, baites.len() as c_int)
         };
         TclObj::new(NonNull::new(ptr).unwrap())
     }
 }
 
-impl ToTclObj for &str {
-    fn to_tcl_obj(self) -> TclObj {
-        self.as_bytes().to_tcl_obj()
-    }
-}
-
 impl ToTclObj for &PyString {
     fn to_tcl_obj(self) -> TclObj {
-        self.as_bytes().to_tcl_obj()
+        self.to_string_lossy().as_ref().to_tcl_obj()
     }
 }
 
@@ -96,6 +99,7 @@ impl ToTclObj for &PyAny {
     }
 }
 
+// FIXME: https://www.tcl.tk/man/tcl8.6/TclLib/Encoding.htm
 impl std::fmt::Display for TclObj {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let s = unsafe { CStr::from_ptr(tcl_sys::Tcl_GetString(self.as_ptr())) };

@@ -43,10 +43,10 @@ mod tests {
         let (mut rust, mut tcl) = create_channel(TclInterp::new().unwrap()).unwrap();
         write!(rust, "\0hello, \0world\0").unwrap();
 
-        let mut data: String = Default::default();
-        tcl.read_to_string(&mut data).unwrap();
+        let mut data: Vec<u8> = Default::default();
+        tcl.read_to_end(&mut data).unwrap();
 
-        assert_eq!(data, "\0hello, \0world\0");
+        assert_eq!(String::from_utf8(data).unwrap(), "\0hello, \0world\0");
     }
 
     #[test]

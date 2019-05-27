@@ -56,11 +56,8 @@ impl Read for TclSocket {
 
 impl Write for TclSocket {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let buf_str =
-            std::str::from_utf8(buf).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
-
         self.interp
-            .call(&["puts", "-nonewline", &self.id, buf_str])
+            .call(objv!["puts", "-nonewline", &self.id, buf.to_tcl_obj()])
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
         Ok(buf.len())

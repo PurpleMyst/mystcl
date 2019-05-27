@@ -6,7 +6,7 @@ use std::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum LetterCommand {
-    Eval = 0,
+    Eval = b'E',
 }
 
 /// Represents a letter that can be passed between post offices.
@@ -24,6 +24,14 @@ impl Letter {
             cmd,
             data: data.into(),
         }
+    }
+
+    pub fn cmd(&self) -> LetterCommand {
+        self.cmd
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.data
     }
 }
 

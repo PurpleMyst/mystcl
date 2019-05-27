@@ -3,6 +3,19 @@
 
 // FIXME: Use a custom-built type instead of `CStr` to handle strings containing NUL bytes.
 
+macro_rules! objv {
+    ($($arg:expr),*) => {{
+        use crate::tclobj::{TclObj, ToTclObj};
+
+        let mut res: Vec<TclObj> = Vec::new();
+        $(
+            res.push($arg.to_tcl_obj());
+        )*
+
+        res
+    }}
+}
+
 mod exceptions;
 mod postoffice;
 mod tclinterp;

@@ -2,9 +2,9 @@
 
 set -ex
 
-dir=$(dirname "$0")
-test -n "$dir/.."
-cd "$dir/.."
+dir="$(dirname "$0")/.."
+test -n "$dir"
+cd "$dir"
 
 if [[ -d dist ]]; then
     rm -rf dist

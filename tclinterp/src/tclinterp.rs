@@ -2,7 +2,8 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     ffi::{CStr, CString},
-    io, mem,
+    io::{self, Write},
+    mem,
     net::TcpStream,
     os::raw::*,
     ptr::{self, NonNull},
@@ -16,7 +17,7 @@ use log::{debug, trace};
 
 use crate::{
     exceptions::TclError,
-    postoffice::{Letter, LetterCommand, PostOffice},
+    postoffice::{TclRequest, TclResponse},
     tclobj::{TclObj, ToTclObj},
     tclsocket::TclSocket,
     wrappers::Objv,
@@ -120,34 +121,36 @@ impl TclInterp {
                 .unwrap()
                 .borrow_mut();
 
-            let msg = match sock.recv_msg() {
+            let request = match bincode::deserialize_from(&mut *sock) {
                 Ok(msg) => msg,
-                Err(ref err) => {
-                    return if err.kind() == io::ErrorKind::UnexpectedEof {
-                        // it's normal that a `readable` fileevent gets called on EOF.
-                        Ok("".to_tcl_obj())
-                    } else {
-                        Err(err.to_string().to_tcl_obj())
-                    };
-                }
+                Err(err) => match *err {
+                    bincode::ErrorKind::Io(ref err)
+                        if err.kind() == io::ErrorKind::UnexpectedEof =>
+                    {
+                        return Ok("".to_tcl_obj())
+                    }
+                    _ => unimplemented!(),
+                },
             };
 
-            let resp_data: Result<Vec<u8>, TclError> = match msg.cmd() {
-                LetterCommand::Eval => cmd_data
-                    .interp
-                    .clone() // TODO: remove this clone later
-                    // FIXME: make TclInterp::Eval take a ToTclObj
-                    .eval(std::str::from_utf8(msg.data()).unwrap().to_owned())
-                    .map(|obj| obj.to_string().into()),
-            };
+            match request {
+                TclRequest::Eval(code) => {
+                    let result = cmd_data
+                        .interp
+                        .clone() // TODO: remove this clone later
+                        .eval(code)
+                        .map(|obj| obj.to_string())
+                        .map_err(|err| err.to_string());
 
-            match resp_data {
-                Ok(resp_data) => {
-                    sock.send_msg(Letter::new(msg.cmd(), resp_data)).unwrap();
+                    bincode::serialize_into(&mut *sock, &TclResponse::Eval(result))
+                        .map_err(|err| err.to_string().to_tcl_obj())?;
+
+                    sock.flush()
+                        .map_err(|err| err.to_string().to_tcl_obj())
+                        .unwrap();
+
                     Ok("".to_tcl_obj())
                 }
-
-                Err(err) => Err(err.to_string().to_tcl_obj()),
             }
         })?;
         self.call(&["fileevent", &tclsock_id, "readable", &cmd_name])?;
@@ -177,13 +180,14 @@ impl TclInterp {
     /// # Errors
     /// This function fails if `code` contains NUL bytes or if there is an error evaluating the Tcl
     /// code.
+    // FIXME: make TclInterp::Eval take a ToTclObj
     pub fn eval(&mut self, code: String) -> Result<TclObj, TclError> {
         trace!("Evaluating code {:?}", code);
 
-        let c_code =
-            CString::new(code).map_err(|_| TclError::new("code must not contain NUL bytes."))?;
-
         if thread::current().id() == attr!(self.owner) {
+            let c_code = CString::new(code)
+                .map_err(|_| TclError::new("code must not contain NUL bytes."))?;
+
             self.check_statuscode(unsafe {
                 tcl_sys::Tcl_Eval(self.interp_ptr()?.as_ptr(), c_code.as_ptr())
             })?;
@@ -191,13 +195,16 @@ impl TclInterp {
             self.get_result()
         } else {
             let mut safety_sock = attr!(self.safety_sock).take().unwrap();
-            safety_sock
-                .send_msg(Letter::new(LetterCommand::Eval, c_code))
-                .unwrap();
 
-            let response = safety_sock.recv_msg().unwrap();
+            bincode::serialize_into(&mut safety_sock, &TclRequest::Eval(code)).unwrap();
+            safety_sock.flush().unwrap();
 
-            Ok(response.data().to_tcl_obj())
+            if let TclResponse::Eval(result) = bincode::deserialize_from(safety_sock).unwrap() {
+                // FIXME. restore safety_sock
+                result.map(|ok| ok.to_tcl_obj()).map_err(TclError::new)
+            } else {
+                unreachable!()
+            }
         }
     }
 
@@ -363,8 +370,8 @@ mod tests {
             })
         };
 
-        barrier.wait();
         let fuckyou = attr!(interp.exit_var_name).clone();
+        barrier.wait();
         interp
             .call(&["after", "100", "set", &fuckyou, "true"])
             .unwrap();

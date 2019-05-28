@@ -1,71 +1,130 @@
 use std::{
+    ffi::CString,
     io::{self, Read, Write},
+    os::raw::*,
     ptr,
 };
 
-use crate::{exceptions::TclError, tclinterp::TclInterp};
+use crate::{
+    channel::{Channel, ChannelHandlers, ChannelOption, TranslationMode},
+    exceptions::TclError,
+    tclinterp::TclInterp,
+    tclobj::TclObj,
+};
 
 /// A wrapper around a Tcl socket that allows Read/Write trait usage.
 pub struct TclSocket {
     interp: TclInterp,
-    id: String,
+    channel_id: tcl_sys::Tcl_Channel,
+    handlers: ChannelHandlers,
 }
 
 impl Drop for TclSocket {
     fn drop(&mut self) {
-        self.interp.call(&["close", &self.id]).unwrap();
+        let res = unsafe {
+            tcl_sys::Tcl_Close(
+                self.interp().interp_ptr().unwrap().as_ptr(),
+                self.channel_id(),
+            )
+        };
+        self.interp().check_statuscode(res).unwrap();
     }
 }
 
 impl TclSocket {
     /// Connect to a specified host:port.
-    pub fn connect(mut interp: TclInterp, host: &str, port: &str) -> Result<Self, TclError> {
-        let id = interp
-            .call(&["socket", host, &port.to_string()])?
-            .to_string();
-        let mut inst = Self { interp, id };
-        inst.fconfigure("blocking", "false")?;
-        inst.fconfigure("translation", "binary")?;
+    pub fn connect(interp: TclInterp, host: &str, port: u16) -> Result<Self, TclError> {
+        let channel_id = unsafe {
+            tcl_sys::Tcl_OpenTcpClient(
+                interp.interp_ptr()?.as_ptr(),
+                port as c_int,
+                CString::new(host).unwrap().as_ptr(),
+                ptr::null(), // random local address
+                0,           // random local port
+                0,           // not async
+            )
+        };
+        if channel_id.is_null() {
+            return Err(interp.get_error()?);
+        }
+
+        let mut inst = Self {
+            interp,
+            channel_id,
+            handlers: Default::default(),
+        };
+        inst.set_option(ChannelOption::Blocking(false))?;
+        inst.set_option(ChannelOption::TranslationMode(TranslationMode::Binary))?;
         Ok(inst)
-    }
-
-    fn fconfigure(&mut self, key: &str, value: &str) -> Result<(), TclError> {
-        self.interp
-            .call(&["fconfigure", &self.id, &format!("-{}", key), value])
-            .map(|_| ())
-    }
-
-    pub fn id(&self) -> String {
-        self.id.clone()
     }
 }
 
 impl Read for TclSocket {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let data = self
-            .interp
-            .call(&["read", &self.id, &buf.len().to_string()])?;
+        let mut output = TclObj::empty()?;
 
-        let data_bytes = data.as_bytes();
+        let res = unsafe {
+            tcl_sys::Tcl_ReadChars(
+                self.channel_id,
+                output.as_ptr(),
+                buf.len() as c_int,
+                0, // don't append
+            )
+        };
+
+        // FIXME: Use `Tcl_GetErrno` to return a `Result::Err`.
+        if res == -1 {
+            panic!("Tcl_ReadChars() returned -1");
+        }
+
+        debug_assert!(res >= 0 && res as usize <= buf.len());
+
+        let data_bytes = output.as_bytes();
+        debug_assert_eq!(res as usize, data_bytes.len());
 
         unsafe { ptr::copy_nonoverlapping(data_bytes.as_ptr(), buf.as_mut_ptr(), data_bytes.len()) }
-
         Ok(data_bytes.len())
     }
 }
 
 impl Write for TclSocket {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.interp
-            .call(objv!["puts", "-nonewline", &self.id, buf.to_tcl_obj()])
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let res = unsafe {
+            tcl_sys::Tcl_WriteChars(
+                self.channel_id(),
+                buf.as_ptr() as *mut c_char,
+                buf.len() as c_int,
+            )
+        };
 
-        Ok(buf.len())
+        if res == -1 {
+            panic!("Tcl_WriteChars() returned -1");
+        }
+
+        debug_assert!(res >= 0 && res as usize <= buf.len());
+        Ok(res as usize)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.interp.call(&["flush", &self.id])?;
+        let res = unsafe { tcl_sys::Tcl_Flush(self.channel_id()) };
 
-        Ok(())
+        self.interp()
+            .check_statuscode(res)
+            .map(|_| ())
+            .map_err(Into::into)
+    }
+}
+
+impl Channel for TclSocket {
+    fn interp(&mut self) -> &mut TclInterp {
+        &mut self.interp
+    }
+
+    fn channel_id(&self) -> tcl_sys::Tcl_Channel {
+        self.channel_id
+    }
+
+    fn handlers(&mut self) -> &mut ChannelHandlers {
+        &mut self.handlers
     }
 }

@@ -17,7 +17,6 @@ extern "C" fn cmd_callback(
     argc: c_int,
     argv: *mut *const c_char,
 ) -> c_int {
-    // XXX: We might need to forget this!!!
     let client_data = unsafe { &mut *(client_data as *mut CommandData) };
     trace!("Calling command {:?}", client_data.name);
 

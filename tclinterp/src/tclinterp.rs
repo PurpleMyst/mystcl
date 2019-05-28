@@ -7,6 +7,7 @@ use std::{
     net::TcpStream,
     os::raw::*,
     ptr::{self, NonNull},
+    rc::Rc,
     slice,
     sync::Arc,
     sync::Mutex,
@@ -16,10 +17,10 @@ use std::{
 use log::{debug, trace};
 
 use crate::{
+    channel::{add_channel_handler, ChannelHandlerMask},
     exceptions::TclError,
     postoffice::{TclRequest, TclResponse},
     tclobj::{TclObj, ToTclObj},
-    tclsocket::TclSocket,
     wrappers::Objv,
 };
 
@@ -111,49 +112,45 @@ impl TclInterp {
 
     pub fn init_threads(&mut self) -> Result<(), TclError> {
         let (rsock, tclsock) = channel::create_channel(self.clone())?;
-        let tclsock_id = tclsock.id();
 
-        let cmd_name = format!("thread_handler{}", rand::random::<u64>());
-        self.createcommand(&cmd_name, Box::new(RefCell::new(tclsock)), |cmd_data, _| {
-            let mut sock = cmd_data
-                .data
-                .downcast_ref::<RefCell<TclSocket>>()
-                .unwrap()
-                .borrow_mut();
+        add_channel_handler(
+            Rc::new(RefCell::new(tclsock)),
+            ChannelHandlerMask::READABLE,
+            |handler_data| {
+                let mut sock = handler_data.sock.borrow_mut();
 
-            let request = match bincode::deserialize_from(&mut *sock) {
-                Ok(msg) => msg,
-                Err(err) => match *err {
-                    bincode::ErrorKind::Io(ref err)
-                        if err.kind() == io::ErrorKind::UnexpectedEof =>
-                    {
-                        return Ok("".to_tcl_obj())
+                let request = match bincode::deserialize_from(&mut *sock) {
+                    Ok(msg) => msg,
+                    Err(err) => match *err {
+                        bincode::ErrorKind::Io(ref err)
+                            if err.kind() == io::ErrorKind::UnexpectedEof =>
+                        {
+                            return;
+                        }
+                        _ => panic!(err),
+                    },
+                };
+
+                match request {
+                    TclRequest::Eval(code) => {
+                        let result = handler_data
+                            .interp
+                            .clone() // TODO: remove this clone later
+                            .eval(code)
+                            .map(|obj| obj.to_string())
+                            .map_err(|err| err.to_string());
+
+                        bincode::serialize_into(&mut *sock, &TclResponse::Eval(result))
+                            .map_err(|err| err.to_string().to_tcl_obj())
+                            .unwrap();
+
+                        sock.flush()
+                            .map_err(|err| err.to_string().to_tcl_obj())
+                            .unwrap();
                     }
-                    _ => unimplemented!(),
-                },
-            };
-
-            match request {
-                TclRequest::Eval(code) => {
-                    let result = cmd_data
-                        .interp
-                        .clone() // TODO: remove this clone later
-                        .eval(code)
-                        .map(|obj| obj.to_string())
-                        .map_err(|err| err.to_string());
-
-                    bincode::serialize_into(&mut *sock, &TclResponse::Eval(result))
-                        .map_err(|err| err.to_string().to_tcl_obj())?;
-
-                    sock.flush()
-                        .map_err(|err| err.to_string().to_tcl_obj())
-                        .unwrap();
-
-                    Ok("".to_tcl_obj())
                 }
-            }
-        })?;
-        self.call(&["fileevent", &tclsock_id, "readable", &cmd_name])?;
+            },
+        );
 
         attr!(self.safety_sock) = Some(rsock);
 
@@ -165,7 +162,7 @@ impl TclInterp {
         (unsafe { tcl_sys::Tcl_InterpDeleted(ptr) }) != 0
     }
 
-    fn interp_ptr(&self) -> Result<Preserve<tcl_sys::Tcl_Interp>, TclError> {
+    pub(crate) fn interp_ptr(&self) -> Result<Preserve<tcl_sys::Tcl_Interp>, TclError> {
         debug_assert_eq!(thread::current().id(), attr!(self.owner));
 
         if self.deleted() {
@@ -194,13 +191,14 @@ impl TclInterp {
 
             self.get_result()
         } else {
+            // FIXME: make this part work more than once. :)
             let mut safety_sock = attr!(self.safety_sock).take().unwrap();
 
             bincode::serialize_into(&mut safety_sock, &TclRequest::Eval(code)).unwrap();
             safety_sock.flush().unwrap();
 
-            if let TclResponse::Eval(result) = bincode::deserialize_from(safety_sock).unwrap() {
-                // FIXME. restore safety_sock
+            if let TclResponse::Eval(result) = bincode::deserialize_from(&mut safety_sock).unwrap()
+            {
                 result.map(|ok| ok.to_tcl_obj()).map_err(TclError::new)
             } else {
                 unreachable!()
@@ -228,7 +226,7 @@ impl TclInterp {
         self.get_result()
     }
 
-    fn get_result(&self) -> Result<TclObj, TclError> {
+    pub(crate) fn get_result(&self) -> Result<TclObj, TclError> {
         let result_ptr = unsafe { tcl_sys::Tcl_GetObjResult(self.interp_ptr()?.as_ptr()) };
 
         NonNull::new(result_ptr)
@@ -236,17 +234,17 @@ impl TclInterp {
             .map(TclObj::new)
     }
 
-    fn set_result(&mut self, obj: TclObj) -> Result<(), TclError> {
+    pub(crate) fn set_result(&mut self, obj: TclObj) -> Result<(), TclError> {
         trace!("Setting result to {:?}", obj);
         unsafe { tcl_sys::Tcl_SetObjResult(self.interp_ptr()?.as_ptr(), obj.as_ptr()) };
         Ok(())
     }
 
-    fn get_error(&self) -> Result<TclError, TclError> {
+    pub(crate) fn get_error(&self) -> Result<TclError, TclError> {
         Ok(TclError::new(self.get_result()?.to_string()))
     }
 
-    fn check_statuscode(&self, value: c_int) -> Result<(), TclError> {
+    pub(crate) fn check_statuscode(&self, value: c_int) -> Result<(), TclError> {
         match value as c_uint {
             tcl_sys::TCL_OK => Ok(()),
             _ => Err(self.get_error()?),
@@ -351,8 +349,10 @@ impl Drop for TclInterpData {
 mod tests {
     use super::*;
 
+    // FIXME. this thread illustrates some lock contetion issues. somebody who is waiting on a
+    // response should not lock the thread.
     #[test]
-    fn test_init_threads() {
+    fn test_init_threads_once() {
         let mut interp = TclInterp::new().unwrap();
         interp.init_threads().unwrap();
 
@@ -379,5 +379,51 @@ mod tests {
 
         let res = child1.join().unwrap().unwrap();
         assert_eq!(res.to_string(), "42");
+    }
+
+    #[test]
+    #[ignore]
+    fn test_init_threads_twice() {
+        let mut interp = TclInterp::new().unwrap();
+        interp.init_threads().unwrap();
+
+        let mut barrier = Arc::new(std::sync::Barrier::new(3));
+
+        let child1 = {
+            let mut interp = interp.clone();
+            let mut barrier = barrier.clone();
+
+            std::thread::spawn(move || {
+                barrier.wait();
+                interp
+                    .eval("format %s 42".to_owned())
+                    .map(|obj| obj.to_string())
+            })
+        };
+
+        let child2 = {
+            let mut interp = interp.clone();
+            let mut barrier = barrier.clone();
+
+            std::thread::spawn(move || {
+                barrier.wait();
+                interp
+                    .eval("format %s 69".to_owned())
+                    .map(|obj| obj.to_string())
+            })
+        };
+
+        let fuckyou = attr!(interp.exit_var_name).clone();
+        barrier.wait();
+        interp
+            .call(&["after", "100", "set", &fuckyou, "true"])
+            .unwrap();
+        interp.mainloop().unwrap();
+
+        let res = child1.join().unwrap().unwrap();
+        assert_eq!(res.to_string(), "42");
+
+        let res = child2.join().unwrap().unwrap();
+        assert_eq!(res.to_string(), "69");
     }
 }

@@ -17,7 +17,7 @@ pub fn create_channel(interp: TclInterp) -> Result<(TcpStream, TclSocket), TclEr
     let server = TcpListener::bind((host, port)).map_err(|_| unimplemented!())?;
     let accept_thread = thread::spawn(move || server.accept().map(|(sock, _)| sock));
 
-    let tcl_sock = TclSocket::connect(interp, host, &port.to_string())?;
+    let tcl_sock = TclSocket::connect(interp, host, port)?;
 
     let rust_sock = accept_thread
         .join()

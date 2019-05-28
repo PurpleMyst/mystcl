@@ -19,7 +19,6 @@ mod exceptions;
 mod postoffice;
 mod tclinterp;
 mod tclobj;
-mod tclsocket;
 mod wrappers;
 
 pub use crate::exceptions::TclError;

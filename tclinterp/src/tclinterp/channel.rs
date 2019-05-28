@@ -5,19 +5,19 @@ use std::{
 
 use rand::Rng;
 
-use crate::tclsocket::TclSocket;
+use crate::channel::Channel;
 
 use super::*;
 
 /// Create a two-way communication channel between Rust and Tcl.
-pub fn create_channel(interp: TclInterp) -> Result<(TcpStream, TclSocket), TclError> {
+pub fn create_channel(interp: TclInterp) -> Result<(TcpStream, Channel), TclError> {
     let host = "127.0.0.1";
     let port = rand::thread_rng().gen_range(1024, 8096);
 
     let server = TcpListener::bind((host, port)).map_err(|_| unimplemented!())?;
     let accept_thread = thread::spawn(move || server.accept().map(|(sock, _)| sock));
 
-    let tcl_sock = TclSocket::connect(interp, host, port)?;
+    let tcl_sock = Channel::open_tcp_client(interp, host, port)?;
 
     let rust_sock = accept_thread
         .join()

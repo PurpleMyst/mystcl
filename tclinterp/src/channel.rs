@@ -11,7 +11,7 @@ use std::{
 
 use bitflags::bitflags;
 
-use crate::{exceptions::TclError, tclinterp::TclInterp, tclobj::TclObj};
+use crate::{exceptions::TclError, interp::TclInterp, obj::TclObj};
 
 #[derive(Clone, Copy)]
 pub enum TranslationMode {

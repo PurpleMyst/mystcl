@@ -1,6 +1,6 @@
 use std::os::raw::*;
 
-use crate::tclobj::{TclObj, ToTclObj};
+use crate::obj::{TclObj, ToTclObj};
 
 /// A wrapper around a list of Tcl objects.
 #[derive(Debug)]

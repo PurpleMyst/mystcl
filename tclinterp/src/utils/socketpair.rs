@@ -5,7 +5,7 @@ use std::{
 
 use rand::Rng;
 
-use crate::{channel::Channel, exceptions::TclError, tclinterp::TclInterp};
+use crate::{channel::Channel, exceptions::TclError, interp::TclInterp};
 
 /// Create a two-way communication channel between Rust and Tcl.
 pub fn create_socketpair(interp: TclInterp) -> Result<(TcpStream, Channel), TclError> {

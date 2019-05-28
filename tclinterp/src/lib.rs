@@ -3,15 +3,15 @@
 
 mod channel;
 mod exceptions;
+mod interp;
+mod obj;
 mod postoffice;
-mod tclinterp;
-mod tclobj;
 mod utils;
 mod wrappers;
 
 pub use crate::exceptions::TclError;
-pub use crate::tclinterp::TclInterp;
-pub use crate::tclobj::{TclObj, ToTclObj};
+pub use crate::interp::TclInterp;
+pub use crate::obj::{TclObj, ToTclObj};
 
 #[cfg(test)]
 mod tests {

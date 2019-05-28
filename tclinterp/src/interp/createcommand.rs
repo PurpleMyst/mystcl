@@ -71,7 +71,7 @@ impl TclInterp {
         name: &str,
         data: Box<Any>,
         cmd: Command,
-    ) -> Result<(), TclError> {
+    ) -> Result<()> {
         let name =
             CString::new(name).map_err(|_| TclError::new("name must not contain NUL bytes."))?;
 
@@ -113,7 +113,7 @@ impl TclInterp {
         Ok(())
     }
 
-    pub fn deletecommand(&mut self, name: &str) -> Result<(), TclError> {
+    pub fn deletecommand(&mut self, name: &str) -> Result<()> {
         let name =
             CString::new(name).map_err(|_| TclError::new("name must not contain NUL bytes."))?;
 

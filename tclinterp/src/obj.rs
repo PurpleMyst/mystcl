@@ -2,7 +2,10 @@ use std::{ffi::CStr, os::raw::*, ptr::NonNull};
 
 use pyo3::types::{PyAny, PyString, PyTuple};
 
-use crate::{error::TclError, wrappers::Objv};
+use crate::{
+    error::{Result, TclError},
+    wrappers::Objv,
+};
 
 pub struct TclObj {
     ptr: NonNull<tcl_sys::Tcl_Obj>,
@@ -16,7 +19,7 @@ impl TclObj {
         TclObj { ptr }
     }
 
-    pub fn empty() -> Result<Self, TclError> {
+    pub fn empty() -> Result<Self> {
         NonNull::new(unsafe { tcl_sys::Tcl_NewObj() })
             .map(Self::new)
             .ok_or_else(|| TclError::new("Tcl_NewObj() returned NULL"))

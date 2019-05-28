@@ -11,7 +11,7 @@ use std::{
 
 use bitflags::bitflags;
 
-use crate::{error::TclError, interp::TclInterp, obj::TclObj};
+use crate::{error::Result, interp::TclInterp, obj::TclObj};
 
 #[derive(Clone, Copy)]
 pub enum TranslationMode {
@@ -72,7 +72,7 @@ impl Drop for Channel {
 
 impl Channel {
     #[inline]
-    fn close(&mut self) -> Result<(), TclError> {
+    fn close(&mut self) -> Result<()> {
         let res = unsafe {
             tcl_sys::Tcl_Close(self.interp.interp_ptr().unwrap().as_ptr(), self.channel_id)
         };
@@ -80,7 +80,7 @@ impl Channel {
     }
 
     #[inline]
-    fn set_option(&mut self, option: ChannelOption) -> Result<(), TclError> {
+    fn set_option(&mut self, option: ChannelOption) -> Result<()> {
         let (option_name, option_value) = match option {
             ChannelOption::Blocking(value) => ("-blocking", value.to_string()),
             ChannelOption::TranslationMode(mode) => (
@@ -108,7 +108,7 @@ impl Channel {
 
 // socket
 impl Channel {
-    pub fn open_tcp_client(interp: TclInterp, host: &str, port: u16) -> Result<Self, TclError> {
+    pub fn open_tcp_client(interp: TclInterp, host: &str, port: u16) -> Result<Self> {
         let host = CString::new(host).unwrap();
         let channel_id = unsafe {
             tcl_sys::Tcl_OpenTcpClient(

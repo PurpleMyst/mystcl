@@ -18,7 +18,7 @@ use log::{debug, trace};
 
 use crate::{
     channel::{add_channel_handler, ChannelHandlerMask},
-    error::TclError,
+    error::{Result, TclError},
     obj::{TclObj, ToTclObj},
     postoffice::{TclRequest, TclResponse},
     utils::{preserve::Preserve, socketpair::create_socketpair},
@@ -65,7 +65,7 @@ impl TclInterp {
     /// tell, should be never).
     ///
     /// It also fails if `Tcl_Init()` fails.
-    pub fn new() -> Result<Self, TclError> {
+    pub fn new() -> Result<Self> {
         unsafe {
             // XXX: Should we move this into its own function and make it "optional"?
             let exit_var_name = format!("exit_var_{}", rand::random::<u64>());
@@ -94,7 +94,7 @@ impl TclInterp {
     }
 
     /// Prepare this interpreter for Tk usage.
-    pub fn init_tk(&mut self) -> Result<(), TclError> {
+    pub fn init_tk(&mut self) -> Result<()> {
         self.check_statuscode(unsafe { tcl_sys::Tk_Init(self.interp_ptr()?.as_ptr()) })?;
 
         // XXX: Can we remove this clone?
@@ -106,7 +106,7 @@ impl TclInterp {
         Ok(())
     }
 
-    pub fn init_threads(&mut self) -> Result<(), TclError> {
+    pub fn init_threads(&mut self) -> Result<()> {
         let (rsock, tclsock) = create_socketpair(self.clone())?;
 
         add_channel_handler(
@@ -158,7 +158,7 @@ impl TclInterp {
         (unsafe { tcl_sys::Tcl_InterpDeleted(ptr) }) != 0
     }
 
-    pub(crate) fn interp_ptr(&self) -> Result<Preserve<tcl_sys::Tcl_Interp>, TclError> {
+    pub(crate) fn interp_ptr(&self) -> Result<Preserve<tcl_sys::Tcl_Interp>> {
         debug_assert_eq!(thread::current().id(), attr!(self.owner));
 
         if self.deleted() {
@@ -174,7 +174,7 @@ impl TclInterp {
     /// This function fails if `code` contains NUL bytes or if there is an error evaluating the Tcl
     /// code.
     // FIXME: make TclInterp::Eval take a ToTclObj
-    pub fn eval(&mut self, code: String) -> Result<TclObj, TclError> {
+    pub fn eval(&mut self, code: String) -> Result<TclObj> {
         trace!("Evaluating code {:?}", code);
 
         if thread::current().id() == attr!(self.owner) {
@@ -207,7 +207,7 @@ impl TclInterp {
     /// # Errors
     /// This function fails if any of the given arguments are not convertable to Tcl objects or if
     /// there is an error evaluating the resulting Tcl code.
-    pub fn call<I>(&mut self, it: I) -> Result<TclObj, TclError>
+    pub fn call<I>(&mut self, it: I) -> Result<TclObj>
     where
         I: IntoIterator,
         I::Item: ToTclObj,
@@ -222,7 +222,7 @@ impl TclInterp {
         self.get_result()
     }
 
-    pub(crate) fn get_result(&self) -> Result<TclObj, TclError> {
+    pub(crate) fn get_result(&self) -> Result<TclObj> {
         let result_ptr = unsafe { tcl_sys::Tcl_GetObjResult(self.interp_ptr()?.as_ptr()) };
 
         NonNull::new(result_ptr)
@@ -230,17 +230,17 @@ impl TclInterp {
             .map(TclObj::new)
     }
 
-    pub(crate) fn set_result(&mut self, obj: TclObj) -> Result<(), TclError> {
+    pub(crate) fn set_result(&mut self, obj: TclObj) -> Result<()> {
         trace!("Setting result to {:?}", obj);
         unsafe { tcl_sys::Tcl_SetObjResult(self.interp_ptr()?.as_ptr(), obj.as_ptr()) };
         Ok(())
     }
 
-    pub(crate) fn get_error(&self) -> Result<TclError, TclError> {
+    pub(crate) fn get_error(&self) -> Result<TclError> {
         Ok(TclError::new(self.get_result()?.to_string()))
     }
 
-    pub(crate) fn check_statuscode(&self, value: c_int) -> Result<(), TclError> {
+    pub(crate) fn check_statuscode(&self, value: c_int) -> Result<()> {
         match value as c_uint {
             tcl_sys::TCL_OK => Ok(()),
             _ => Err(self.get_error()?),
@@ -251,7 +251,7 @@ impl TclInterp {
     ///
     /// # Errors
     /// This function fails if `arg` can not be converted to a Tcl list.
-    pub fn splitlist(&self, arg: impl ToTclObj) -> Result<Vec<String>, TclError> {
+    pub fn splitlist(&self, arg: impl ToTclObj) -> Result<Vec<String>> {
         let obj = arg.to_tcl_obj();
 
         let mut objc: c_int = 0;
@@ -278,7 +278,7 @@ impl TclInterp {
     ///
     /// # Errors
     /// This function fails if `s` contains NUL bytes or if `s` is not a Tcl bool.
-    pub fn getboolean(&self, s: String) -> Result<bool, TclError> {
+    pub fn getboolean(&self, s: String) -> Result<bool> {
         let s =
             CString::new(s).map_err(|_| TclError::new("Argument must not contain NUL bytes."))?;
 
@@ -295,13 +295,13 @@ impl TclInterp {
     ///
     /// After this function returns, most (if not all) of the methods in this struct become
     /// unaccessible.
-    pub fn delete(&mut self) -> Result<(), TclError> {
+    pub fn delete(&mut self) -> Result<()> {
         debug!("Deleting interpreter");
         unsafe { tcl_sys::Tcl_DeleteInterp(self.interp_ptr()?.as_ptr()) };
         Ok(())
     }
 
-    fn get_var(&self, name: &CStr) -> Result<TclObj, TclError> {
+    fn get_var(&self, name: &CStr) -> Result<TclObj> {
         let ptr = unsafe {
             tcl_sys::Tcl_GetVar2Ex(self.interp_ptr()?.as_ptr(), name.as_ptr(), ptr::null(), 0)
         };
@@ -311,7 +311,7 @@ impl TclInterp {
     }
 
     /// Run the Tcl mainloop.
-    pub fn mainloop(&mut self) -> Result<(), TclError> {
+    pub fn mainloop(&mut self) -> Result<()> {
         let exit_var_name = CString::new(attr!(self.exit_var_name).clone()).unwrap();
 
         while !self.deleted() && self.get_var(exit_var_name.as_ref())?.to_string() != "true" {

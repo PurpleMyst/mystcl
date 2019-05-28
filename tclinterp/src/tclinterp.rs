@@ -21,7 +21,7 @@ use crate::{
     exceptions::TclError,
     postoffice::{TclRequest, TclResponse},
     tclobj::{TclObj, ToTclObj},
-    utils::socketpair::create_socketpair,
+    utils::{preserve::Preserve, socketpair::create_socketpair},
     wrappers::Objv,
 };
 
@@ -34,9 +34,6 @@ macro_rules! attr {
 
 mod createcommand;
 use createcommand::CommandData;
-
-mod preserve;
-use preserve::Preserve;
 
 struct TclInterpData {
     interp: NonNull<tcl_sys::Tcl_Interp>,

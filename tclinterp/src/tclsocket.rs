@@ -21,13 +21,7 @@ pub struct TclSocket {
 
 impl Drop for TclSocket {
     fn drop(&mut self) {
-        let res = unsafe {
-            tcl_sys::Tcl_Close(
-                self.interp().interp_ptr().unwrap().as_ptr(),
-                self.channel_id(),
-            )
-        };
-        self.interp().check_statuscode(res).unwrap();
+        self.close().unwrap();
     }
 }
 

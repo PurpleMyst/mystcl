@@ -2,7 +2,7 @@ use std::{ffi::CStr, os::raw::*, ptr::NonNull};
 
 use pyo3::types::{PyAny, PyString, PyTuple};
 
-use crate::{exceptions::TclError, wrappers::Objv};
+use crate::{error::TclError, wrappers::Objv};
 
 pub struct TclObj {
     ptr: NonNull<tcl_sys::Tcl_Obj>,

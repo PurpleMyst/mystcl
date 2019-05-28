@@ -18,7 +18,7 @@ use log::{debug, trace};
 
 use crate::{
     channel::{add_channel_handler, ChannelHandlerMask},
-    exceptions::TclError,
+    error::TclError,
     obj::{TclObj, ToTclObj},
     postoffice::{TclRequest, TclResponse},
     utils::{preserve::Preserve, socketpair::create_socketpair},

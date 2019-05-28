@@ -2,14 +2,14 @@
 #![allow(clippy::identity_conversion)] // Because clippy complains about pyo3.
 
 mod channel;
-mod exceptions;
+mod error;
 mod interp;
 mod obj;
 mod postoffice;
 mod utils;
 mod wrappers;
 
-pub use crate::exceptions::TclError;
+pub use crate::error::TclError;
 pub use crate::interp::TclInterp;
 pub use crate::obj::{TclObj, ToTclObj};
 

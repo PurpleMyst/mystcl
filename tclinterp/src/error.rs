@@ -25,3 +25,5 @@ impl From<TclError> for std::io::Error {
         std::io::Error::new(std::io::ErrorKind::Other, err)
     }
 }
+
+pub type Result<T, E = TclError> = std::result::Result<T, E>;

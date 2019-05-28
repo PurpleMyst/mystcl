@@ -5,12 +5,10 @@ use std::{
 
 use rand::Rng;
 
-use crate::channel::Channel;
-
-use super::*;
+use crate::{channel::Channel, exceptions::TclError, tclinterp::TclInterp};
 
 /// Create a two-way communication channel between Rust and Tcl.
-pub fn create_channel(interp: TclInterp) -> Result<(TcpStream, Channel), TclError> {
+pub fn create_socketpair(interp: TclInterp) -> Result<(TcpStream, Channel), TclError> {
     let host = "127.0.0.1";
     let port = rand::thread_rng().gen_range(1024, 8096);
 
@@ -35,12 +33,12 @@ mod tests {
 
     #[test]
     fn test_creation() {
-        assert!(create_channel(TclInterp::new().unwrap()).is_ok());
+        assert!(create_socketpair(TclInterp::new().unwrap()).is_ok());
     }
 
     #[test]
     fn test_tclsock_recv_data() {
-        let (mut rust, mut tcl) = create_channel(TclInterp::new().unwrap()).unwrap();
+        let (mut rust, mut tcl) = create_socketpair(TclInterp::new().unwrap()).unwrap();
         write!(rust, "\0hello, \0world\0").unwrap();
 
         let mut data: Vec<u8> = Default::default();
@@ -51,7 +49,7 @@ mod tests {
 
     #[test]
     fn test_tclsock_recv_empty() {
-        let (_, mut tcl) = create_channel(TclInterp::new().unwrap()).unwrap();
+        let (_, mut tcl) = create_socketpair(TclInterp::new().unwrap()).unwrap();
 
         let mut data: String = Default::default();
         tcl.read_to_string(&mut data).unwrap();
@@ -61,7 +59,7 @@ mod tests {
 
     #[test]
     fn test_tclsock_send() {
-        let (rust, mut tcl) = create_channel(TclInterp::new().unwrap()).unwrap();
+        let (rust, mut tcl) = create_socketpair(TclInterp::new().unwrap()).unwrap();
         write!(tcl, "\0hello, \0world\0\n").unwrap();
         tcl.flush().unwrap();
 

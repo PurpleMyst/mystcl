@@ -21,6 +21,7 @@ use crate::{
     exceptions::TclError,
     postoffice::{TclRequest, TclResponse},
     tclobj::{TclObj, ToTclObj},
+    utils::socketpair::create_socketpair,
     wrappers::Objv,
 };
 
@@ -36,8 +37,6 @@ use createcommand::CommandData;
 
 mod preserve;
 use preserve::Preserve;
-
-mod channel;
 
 struct TclInterpData {
     interp: NonNull<tcl_sys::Tcl_Interp>,
@@ -111,7 +110,7 @@ impl TclInterp {
     }
 
     pub fn init_threads(&mut self) -> Result<(), TclError> {
-        let (rsock, tclsock) = channel::create_channel(self.clone())?;
+        let (rsock, tclsock) = create_socketpair(self.clone())?;
 
         add_channel_handler(
             Rc::new(RefCell::new(tclsock)),

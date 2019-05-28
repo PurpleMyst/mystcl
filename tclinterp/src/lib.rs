@@ -6,6 +6,7 @@ mod exceptions;
 mod postoffice;
 mod tclinterp;
 mod tclobj;
+mod utils;
 mod wrappers;
 
 pub use crate::exceptions::TclError;

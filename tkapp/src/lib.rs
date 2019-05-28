@@ -1,3 +1,5 @@
+#![allow(clippy::identity_conversion)]
+
 use std::sync::Once;
 
 use pyo3::{create_exception, prelude::*, types::*, wrap_pyfunction};

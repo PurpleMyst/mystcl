@@ -1,19 +1,6 @@
 #![deny(unused_imports, unused_must_use)]
 #![allow(clippy::identity_conversion)] // Because clippy complains about pyo3.
 
-macro_rules! objv {
-    ($($arg:expr),*) => {{
-        use crate::tclobj::{TclObj, ToTclObj};
-
-        let mut res: Vec<TclObj> = Vec::new();
-        $(
-            res.push($arg.to_tcl_obj());
-        )*
-
-        res
-    }}
-}
-
 mod channel;
 mod exceptions;
 mod postoffice;

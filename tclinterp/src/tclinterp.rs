@@ -199,7 +199,7 @@ impl TclInterp {
 
             if let TclResponse::Eval(result) = bincode::deserialize_from(&mut safety_sock).unwrap()
             {
-                result.map(|ok| ok.to_tcl_obj()).map_err(TclError::new)
+                result.map(|ref ok| ok.to_tcl_obj()).map_err(TclError::new)
             } else {
                 unreachable!()
             }
@@ -356,11 +356,11 @@ mod tests {
         let mut interp = TclInterp::new().unwrap();
         interp.init_threads().unwrap();
 
-        let mut barrier = Arc::new(std::sync::Barrier::new(2));
+        let barrier = Arc::new(std::sync::Barrier::new(2));
 
         let child1 = {
             let mut interp = interp.clone();
-            let mut barrier = barrier.clone();
+            let barrier = barrier.clone();
 
             std::thread::spawn(move || {
                 barrier.wait();
@@ -387,11 +387,11 @@ mod tests {
         let mut interp = TclInterp::new().unwrap();
         interp.init_threads().unwrap();
 
-        let mut barrier = Arc::new(std::sync::Barrier::new(3));
+        let barrier = Arc::new(std::sync::Barrier::new(3));
 
         let child1 = {
             let mut interp = interp.clone();
-            let mut barrier = barrier.clone();
+            let barrier = barrier.clone();
 
             std::thread::spawn(move || {
                 barrier.wait();
@@ -403,7 +403,7 @@ mod tests {
 
         let child2 = {
             let mut interp = interp.clone();
-            let mut barrier = barrier.clone();
+            let barrier = barrier.clone();
 
             std::thread::spawn(move || {
                 barrier.wait();

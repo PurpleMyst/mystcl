@@ -109,11 +109,12 @@ impl Channel {
 // socket
 impl Channel {
     pub fn open_tcp_client(interp: TclInterp, host: &str, port: u16) -> Result<Self, TclError> {
+        let host = CString::new(host).unwrap();
         let channel_id = unsafe {
             tcl_sys::Tcl_OpenTcpClient(
                 interp.interp_ptr()?.as_ptr(),
-                port as c_int,
-                CString::new(host).unwrap().as_ptr(),
+                c_int::from(port),
+                host.as_ptr(),
                 ptr::null(), // random local address
                 0,           // random local port
                 0,           // not async
@@ -166,7 +167,7 @@ pub fn add_channel_handler(
 
 impl Read for Channel {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let mut output = TclObj::empty()?;
+        let output = TclObj::empty()?;
 
         let res = unsafe {
             tcl_sys::Tcl_ReadChars(

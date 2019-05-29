@@ -201,21 +201,19 @@ impl TclInterp {
     /// # Errors
     /// This function fails if `code` contains NUL bytes or if there is an error evaluating the Tcl
     /// code.
-    // FIXME: make TclInterp::Eval take a ToTclObj
-    pub fn eval(&mut self, code: String) -> Result<TclObj> {
+    pub fn eval(&mut self, code: impl ToTclObj) -> Result<TclObj> {
+        let code = code.to_tcl_obj();
+
         trace!("Evaluating code {:?}", code);
 
         if self.is_main_thread() {
-            let c_code = CString::new(code)
-                .map_err(|_| TclError::new("code must not contain NUL bytes."))?;
-
             self.check_statuscode(unsafe {
-                tcl_sys::Tcl_Eval(self.interp_ptr()?.as_ptr(), c_code.as_ptr())
+                tcl_sys::Tcl_EvalObj(self.interp_ptr()?.as_ptr(), code.as_ptr())
             })?;
 
             self.get_result()
         } else {
-            communicate!(self: TclRequest::Eval(code) => TclResponse::Eval(result) => {
+            communicate!(self: TclRequest::Eval(code.to_string()) => TclResponse::Eval(result) => {
                 result.map(|ref ok| ok.to_tcl_obj()).map_err(TclError::new)
             })
         }
@@ -375,15 +373,10 @@ mod tests {
         let mut interp = TclInterp::new().unwrap();
         interp.init_threads().unwrap();
 
-        let barrier = Arc::new(std::sync::Barrier::new(2));
-
         let child1 = {
             let mut interp = interp.clone();
-            let barrier = barrier.clone();
 
             std::thread::spawn(move || {
-                barrier.wait();
-
                 let a = interp
                     .eval("format %s 4".to_owned())
                     .map(|obj| obj.to_string())
@@ -399,7 +392,6 @@ mod tests {
         };
 
         let fuckyou = attr!(interp.exit_var_name).clone();
-        barrier.wait();
         interp
             .call(&["after", "100", "set", &fuckyou, "true"])
             .unwrap();
@@ -414,14 +406,9 @@ mod tests {
         let mut interp = TclInterp::new().unwrap();
         interp.init_threads().unwrap();
 
-        let barrier = Arc::new(std::sync::Barrier::new(3));
-
         let child1 = {
             let mut interp = interp.clone();
-            let barrier = barrier.clone();
-
             std::thread::spawn(move || {
-                barrier.wait();
                 interp
                     .eval("format %s 42".to_owned())
                     .map(|obj| obj.to_string())
@@ -430,10 +417,7 @@ mod tests {
 
         let child2 = {
             let mut interp = interp.clone();
-            let barrier = barrier.clone();
-
             std::thread::spawn(move || {
-                barrier.wait();
                 interp
                     .eval("format %s 69".to_owned())
                     .map(|obj| obj.to_string())
@@ -441,7 +425,6 @@ mod tests {
         };
 
         let fuckyou = attr!(interp.exit_var_name).clone();
-        barrier.wait();
         interp
             .call(&["after", "100", "set", &fuckyou, "true"])
             .unwrap();

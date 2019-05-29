@@ -56,7 +56,7 @@ impl ToTclObj for TclObj {
 // It's basically meant for &&str
 impl<T> ToTclObj for &T
 where
-    T: Copy + ToTclObj,
+    T: Clone + ToTclObj,
 {
     fn to_tcl_obj(self) -> TclObj {
         self.clone().to_tcl_obj()
@@ -108,6 +108,12 @@ impl ToTclObj for &PyAny {
         } else {
             unimplemented!("ToTclObj::to_tcl_obj for {:?}", self)
         }
+    }
+}
+
+impl ToTclObj for String {
+    fn to_tcl_obj(self) -> TclObj {
+        (&self as &str).to_tcl_obj()
     }
 }
 

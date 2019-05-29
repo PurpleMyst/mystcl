@@ -41,7 +41,10 @@ struct TclInterpData {
     exit_var_name: String,
 
     owner: thread::ThreadId,
-    safety_sock: Option<TcpStream>,
+
+    // we use another Arc<Mutex<_>> here so that the whole interpreter can be used even while this
+    // sock is held.
+    safety_sock: Arc<Mutex<Option<TcpStream>>>,
 }
 
 unsafe impl Send for TclInterpData {}
@@ -123,7 +126,7 @@ impl TclInterp {
                         {
                             return;
                         }
-                        _ => panic!(err),
+                        _ => panic!("{:?}", err),
                     },
                 };
 
@@ -148,7 +151,7 @@ impl TclInterp {
             },
         );
 
-        attr!(self.safety_sock) = Some(rsock);
+        attr!(self.safety_sock) = Arc::new(Mutex::new(Some(rsock)));
 
         Ok(())
     }
@@ -187,8 +190,12 @@ impl TclInterp {
 
             self.get_result()
         } else {
-            // FIXME: make this part work more than once. :)
-            let mut safety_sock = attr!(self.safety_sock).take().unwrap();
+            let safety_sock_attr = { attr!(self.safety_sock).clone() };
+
+            let mut safety_sock_mutex = safety_sock_attr.lock().unwrap();
+            let mut safety_sock = safety_sock_mutex
+                .as_mut()
+                .expect("Can not call eval from other threads before init_threads()");
 
             bincode::serialize_into(&mut safety_sock, &TclRequest::Eval(code)).unwrap();
             safety_sock.flush().unwrap();
@@ -360,9 +367,18 @@ mod tests {
 
             std::thread::spawn(move || {
                 barrier.wait();
-                interp
-                    .eval("format %s 42".to_owned())
+
+                let a = interp
+                    .eval("format %s 4".to_owned())
                     .map(|obj| obj.to_string())
+                    .unwrap();
+
+                let b = interp
+                    .eval("format %s 2".to_owned())
+                    .map(|obj| obj.to_string())
+                    .unwrap();
+
+                a + &b
             })
         };
 
@@ -373,12 +389,11 @@ mod tests {
             .unwrap();
         interp.mainloop().unwrap();
 
-        let res = child1.join().unwrap().unwrap();
+        let res = child1.join().unwrap();
         assert_eq!(res.to_string(), "42");
     }
 
     #[test]
-    #[ignore]
     fn test_init_threads_twice() {
         let mut interp = TclInterp::new().unwrap();
         interp.init_threads().unwrap();

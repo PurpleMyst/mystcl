@@ -40,6 +40,7 @@ mod tests {
     fn test_tclsock_recv_data() {
         let (mut rust, mut tcl) = create_socketpair(TclInterp::new().unwrap()).unwrap();
         write!(rust, "\0hello, \0world\0").unwrap();
+        std::mem::drop(rust);
 
         let mut data: Vec<u8> = Default::default();
         tcl.read_to_end(&mut data).unwrap();

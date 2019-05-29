@@ -129,7 +129,6 @@ impl Channel {
             channel_id,
             handlers: Default::default(),
         };
-        inst.set_option(ChannelOption::Blocking(false))?;
         inst.set_option(ChannelOption::TranslationMode(TranslationMode::Binary))?;
         Ok(inst)
     }

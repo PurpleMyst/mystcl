@@ -28,7 +28,7 @@ use crate::{
 /// Access a TclInterpData attribute through the Arc<Mutex<_>>.
 macro_rules! attr {
     ($self:ident.$name:ident) => {
-        $self.0.try_lock().unwrap().$name
+        $self.0.lock().unwrap().$name
     };
 }
 
@@ -39,7 +39,7 @@ macro_rules! communicate {
         let mut safety_sock_mutex = safety_sock_attr.lock().unwrap();
         let mut safety_sock = safety_sock_mutex
             .as_mut()
-            .expect("Can not call eval from other threads before init_threads()");
+            .expect("Can not call methods from other threads before init_threads()");
 
         bincode::serialize_into(&mut safety_sock, &$request).unwrap();
         safety_sock.flush().unwrap();
@@ -231,14 +231,18 @@ impl TclInterp {
         I: IntoIterator,
         I::Item: ToTclObj,
     {
-        let objv = Objv::new(it);
-        trace!("Calling {:?}", objv);
+        if self.is_main_thread() {
+            let objv = Objv::new(it);
+            trace!("Calling {:?}", objv);
 
-        self.check_statuscode(unsafe {
-            tcl_sys::Tcl_EvalObjv(self.interp_ptr()?.as_ptr(), objv.len(), objv.as_ptr(), 0)
-        })?;
+            self.check_statuscode(unsafe {
+                tcl_sys::Tcl_EvalObjv(self.interp_ptr()?.as_ptr(), objv.len(), objv.as_ptr(), 0)
+            })?;
 
-        self.get_result()
+            self.get_result()
+        } else {
+            unimplemented!();
+        }
     }
 
     pub(crate) fn get_result(&self) -> Result<TclObj> {

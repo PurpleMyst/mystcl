@@ -32,6 +32,26 @@ macro_rules! attr {
     };
 }
 
+macro_rules! communicate {
+    ($self:ident: $request:expr => $response:pat => $result:expr) => {{
+        let safety_sock_attr = { attr!($self.safety_sock).clone() };
+
+        let mut safety_sock_mutex = safety_sock_attr.lock().unwrap();
+        let mut safety_sock = safety_sock_mutex
+            .as_mut()
+            .expect("Can not call eval from other threads before init_threads()");
+
+        bincode::serialize_into(&mut safety_sock, &$request).unwrap();
+        safety_sock.flush().unwrap();
+
+        if let $response = bincode::deserialize_from(&mut safety_sock).unwrap() {
+            $result
+        } else {
+            unreachable!()
+        }
+    }};
+}
+
 mod createcommand;
 use createcommand::CommandData;
 
@@ -171,6 +191,11 @@ impl TclInterp {
         Ok(Preserve::new(attr!(self.interp)))
     }
 
+    #[inline]
+    fn is_main_thread(&self) -> bool {
+        thread::current().id() == attr!(self.owner)
+    }
+
     /// Evaluate a piece of Tcl code given as a string.
     ///
     /// # Errors
@@ -180,7 +205,7 @@ impl TclInterp {
     pub fn eval(&mut self, code: String) -> Result<TclObj> {
         trace!("Evaluating code {:?}", code);
 
-        if thread::current().id() == attr!(self.owner) {
+        if self.is_main_thread() {
             let c_code = CString::new(code)
                 .map_err(|_| TclError::new("code must not contain NUL bytes."))?;
 
@@ -190,22 +215,9 @@ impl TclInterp {
 
             self.get_result()
         } else {
-            let safety_sock_attr = { attr!(self.safety_sock).clone() };
-
-            let mut safety_sock_mutex = safety_sock_attr.lock().unwrap();
-            let mut safety_sock = safety_sock_mutex
-                .as_mut()
-                .expect("Can not call eval from other threads before init_threads()");
-
-            bincode::serialize_into(&mut safety_sock, &TclRequest::Eval(code)).unwrap();
-            safety_sock.flush().unwrap();
-
-            if let TclResponse::Eval(result) = bincode::deserialize_from(&mut safety_sock).unwrap()
-            {
+            communicate!(self: TclRequest::Eval(code) => TclResponse::Eval(result) => {
                 result.map(|ref ok| ok.to_tcl_obj()).map_err(TclError::new)
-            } else {
-                unreachable!()
-            }
+            })
         }
     }
 

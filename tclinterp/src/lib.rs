@@ -50,7 +50,7 @@ mod tests {
         assert_eq!(
             TclInterp::new()
                 .unwrap()
-                .eval("format %s {42}".to_owned())
+                .eval("format %s {42}")
                 .unwrap()
                 .to_string(),
             "42"

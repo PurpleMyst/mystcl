@@ -66,12 +66,7 @@ extern "C" fn cmd_deleter(client_data: *mut c_void) {
 }
 
 impl TclInterp {
-    pub fn createcommand(
-        &mut self,
-        name: &str,
-        data: Box<Any>,
-        cmd: Command,
-    ) -> Result<()> {
+    pub fn createcommand(&mut self, name: &str, data: Box<Any>, cmd: Command) -> Result<()> {
         let name =
             CString::new(name).map_err(|_| TclError::new("name must not contain NUL bytes."))?;
 
@@ -144,11 +139,11 @@ mod tests {
             .createcommand("foo", Box::new("bar".to_string()), |data, _args| {
                 data.data
                     .downcast_ref::<String>()
-                    .map(|s| s.to_tcl_obj())
+                    .map(|ref s| (s as &str).to_tcl_obj())
                     .ok_or_else(|| unreachable!())
             })
             .unwrap();
-        assert_eq!(interp.eval("foo".to_string()).unwrap().to_string(), "bar");
+        assert_eq!(interp.eval("foo").unwrap().to_string(), "bar");
     }
 
     #[test]
@@ -167,7 +162,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             interp
-                .eval("ham spam ham spam spam ham ham spam".to_string())
+                .eval("ham spam ham spam spam ham ham spam")
                 .unwrap()
                 .to_string(),
             "spam ham spam spam ham ham spam"
@@ -182,9 +177,9 @@ mod tests {
             .unwrap();
 
         assert!(attr!(interp.commands).contains_key(&CString::new("foo").unwrap()));
-        assert!(interp.eval("foo".to_owned()).is_ok());
+        assert!(interp.eval("foo").is_ok());
         interp.deletecommand("foo").unwrap();
         assert!(!attr!(interp.commands).contains_key(&CString::new("foo").unwrap()));
-        assert!(interp.eval("foo".to_owned()).is_err());
+        assert!(interp.eval("foo").is_err());
     }
 }

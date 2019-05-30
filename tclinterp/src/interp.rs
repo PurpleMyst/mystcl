@@ -107,7 +107,7 @@ impl TclInterp {
 
             let mut inst = Self(interp);
 
-            inst.eval(String::from("rename exit {}"))?;
+            inst.eval("rename exit {}")?;
             inst.eval(format!("set {} false", exit_var_name))?;
 
             inst.check_statuscode(tcl_sys::Tcl_Init(inst.interp_ptr()?.as_ptr()))?;
@@ -123,7 +123,7 @@ impl TclInterp {
         // XXX: Can we remove this clone?
         let exit_var_name = attr!(self.exit_var_name).clone();
 
-        self.eval(String::from("package require Tk"))?;
+        self.eval("package require Tk")?;
         self.eval(format!("bind . <Destroy> {{ set {} true }}", exit_var_name))?;
 
         Ok(())
@@ -214,7 +214,7 @@ impl TclInterp {
             self.get_result()
         } else {
             communicate!(self: TclRequest::Eval(code.to_string()) => TclResponse::Eval(result) => {
-                result.map(|ref ok| ok.to_tcl_obj()).map_err(TclError::new)
+                result.map(|ref ok| (ok as &str).to_tcl_obj()).map_err(TclError::new)
             })
         }
     }
@@ -378,12 +378,12 @@ mod tests {
 
             std::thread::spawn(move || {
                 let a = interp
-                    .eval("format %s 4".to_owned())
+                    .eval("format %s 4")
                     .map(|obj| obj.to_string())
                     .unwrap();
 
                 let b = interp
-                    .eval("format %s 2".to_owned())
+                    .eval("format %s 2")
                     .map(|obj| obj.to_string())
                     .unwrap();
 
@@ -408,20 +408,12 @@ mod tests {
 
         let child1 = {
             let mut interp = interp.clone();
-            std::thread::spawn(move || {
-                interp
-                    .eval("format %s 42".to_owned())
-                    .map(|obj| obj.to_string())
-            })
+            std::thread::spawn(move || interp.eval("format %s 42").map(|obj| obj.to_string()))
         };
 
         let child2 = {
             let mut interp = interp.clone();
-            std::thread::spawn(move || {
-                interp
-                    .eval("format %s 69".to_owned())
-                    .map(|obj| obj.to_string())
-            })
+            std::thread::spawn(move || interp.eval("format %s 69").map(|obj| obj.to_string()))
         };
 
         let fuckyou = attr!(interp.exit_var_name).clone();

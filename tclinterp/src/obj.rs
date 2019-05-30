@@ -52,11 +52,9 @@ impl ToTclObj for TclObj {
     }
 }
 
-// XXX: This feels like a weird instance.
-// It's basically meant for &&str
 impl<T> ToTclObj for &T
 where
-    T: Clone + ToTclObj,
+    T: Copy + ToTclObj,
 {
     fn to_tcl_obj(self) -> TclObj {
         self.clone().to_tcl_obj()

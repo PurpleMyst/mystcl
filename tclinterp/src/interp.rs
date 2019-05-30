@@ -150,24 +150,32 @@ impl TclInterp {
                     },
                 };
 
-                match request {
-                    TclRequest::Eval(code) => {
-                        let result = handler_data
-                            .interp
-                            .clone() // TODO: remove this clone later
+                let mut interp = handler_data.interp.clone();
+                let response = match request {
+                    TclRequest::Eval(code) => TclResponse::Eval(
+                        interp
                             .eval(code)
-                            .map(|obj| obj.to_string())
-                            .map_err(|err| err.to_string());
+                            .as_ref()
+                            .map(ToString::to_string)
+                            .map_err(ToString::to_string),
+                    ),
 
-                        bincode::serialize_into(&mut *sock, &TclResponse::Eval(result))
-                            .map_err(|err| err.to_string().to_tcl_obj())
-                            .unwrap();
+                    TclRequest::Call(objv) => TclResponse::Call(
+                        interp
+                            .call(objv)
+                            .as_ref()
+                            .map(ToString::to_string)
+                            .map_err(ToString::to_string),
+                    ),
+                };
 
-                        sock.flush()
-                            .map_err(|err| err.to_string().to_tcl_obj())
-                            .unwrap();
-                    }
-                }
+                bincode::serialize_into(&mut *sock, &response)
+                    .map_err(|err| err.to_string().to_tcl_obj())
+                    .unwrap();
+
+                sock.flush()
+                    .map_err(|err| err.to_string().to_tcl_obj())
+                    .unwrap();
             },
         );
 
@@ -239,7 +247,9 @@ impl TclInterp {
 
             self.get_result()
         } else {
-            unimplemented!();
+            communicate!(self: TclRequest::Call(it.into_iter().map(|obj| obj.to_tcl_obj().to_string()).collect()) => TclResponse::Call(result) => {
+                result.map(|ref ok| (ok as &str).to_tcl_obj()).map_err(TclError::new)
+            })
         }
     }
 
@@ -383,7 +393,7 @@ mod tests {
                     .unwrap();
 
                 let b = interp
-                    .eval("format %s 2")
+                    .call(&["format", "%s", "2"])
                     .map(|obj| obj.to_string())
                     .unwrap();
 

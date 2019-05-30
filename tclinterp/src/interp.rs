@@ -17,7 +17,7 @@ use std::{
 use log::{debug, trace};
 
 use crate::{
-    channel::{add_channel_handler, ChannelHandlerMask},
+    channel::{Channel, ChannelHandlerMask},
     error::{Result, TclError},
     obj::{TclObj, ToTclObj},
     postoffice::{TclRequest, TclResponse},
@@ -132,7 +132,7 @@ impl TclInterp {
     pub fn init_threads(&mut self) -> Result<()> {
         let (rsock, tclsock) = create_socketpair(self.clone())?;
 
-        add_channel_handler(
+        Channel::add_handler(
             Rc::new(RefCell::new(tclsock)),
             ChannelHandlerMask::READABLE,
             |handler_data| {

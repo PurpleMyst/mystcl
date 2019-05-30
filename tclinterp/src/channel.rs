@@ -132,36 +132,32 @@ impl Channel {
         inst.set_option(ChannelOption::TranslationMode(TranslationMode::Binary))?;
         Ok(inst)
     }
-}
 
-#[inline]
-pub fn add_channel_handler(
-    this: Rc<RefCell<Channel>>,
-    mask: ChannelHandlerMask,
-    proc: ChannelHandler,
-) {
-    extern "C" fn tcl_channel_proc(client_data: *mut c_void, _mask: c_int) {
-        let client_data = unsafe { &mut *(client_data as *mut ChannelHandlerData) };
+    #[inline]
+    pub fn add_handler(this: Rc<RefCell<Channel>>, mask: ChannelHandlerMask, proc: ChannelHandler) {
+        extern "C" fn tcl_channel_proc(client_data: *mut c_void, _mask: c_int) {
+            let client_data = unsafe { &mut *(client_data as *mut ChannelHandlerData) };
 
-        (client_data.handler)(client_data);
+            (client_data.handler)(client_data);
+        }
+
+        let handler_data = Box::into_raw(Box::new(ChannelHandlerData {
+            interp: this.borrow_mut().interp.clone(),
+            handler: proc,
+            sock: this.clone(),
+        }));
+
+        this.borrow_mut().handlers.add(handler_data);
+
+        unsafe {
+            tcl_sys::Tcl_CreateChannelHandler(
+                this.borrow().channel_id,
+                mask.bits() as c_int,
+                Some(tcl_channel_proc),
+                handler_data as *mut c_void,
+            )
+        };
     }
-
-    let handler_data = Box::into_raw(Box::new(ChannelHandlerData {
-        interp: this.borrow_mut().interp.clone(),
-        handler: proc,
-        sock: this.clone(),
-    }));
-
-    this.borrow_mut().handlers.add(handler_data);
-
-    unsafe {
-        tcl_sys::Tcl_CreateChannelHandler(
-            this.borrow().channel_id,
-            mask.bits() as c_int,
-            Some(tcl_channel_proc),
-            handler_data as *mut c_void,
-        )
-    };
 }
 
 impl Read for Channel {
